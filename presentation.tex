@@ -1,0 +1,612 @@
+\documentclass{beamer}
+\usepackage{bussproofs}
+\usepackage{graphicx}
+\usepackage{multicol}
+
+\title{Curry-Howard Correspondence}
+\author{Tristan McDermott}
+\institute{Advisor: Tibor Beke}
+\date{December 12, 2025}
+
+\begin{document}
+
+\frame{\titlepage}
+
+% give them a "soft start", almost like history: lambda calc was invented by church as a foundation of math, so was intuitionistic logic (they thought proofs by contradiction were stupid), then much later curry and howard noticed the correspondence
+\begin{frame}{Introduction}
+    \begin{itemize}
+        \item \textbf{Curry-Howard correspondence:} establishes a connection between logic and type theory
+        \item ``Proofs are programs'' (and vice versa)
+        \item First noticed by Haskell Curry in 1958 (but between different systems we won't talk about)
+        \item Added onto by William Howard in 1969
+        \item He noticed a connection between \textbf{lambda calculus} and \textbf{natural deduction}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Lambda calculus}
+    \begin{itemize}
+        \item \textbf{Lambda calculus:} a formal language dealing with functions
+        \item Basically, a very simple programming language
+        \item Terms have 3 forms:
+        \begin{itemize}
+            \item Variable: $x$
+            \item Abstraction: $\lambda x. M$
+            \item Application: $M N$
+        \end{itemize}
+        \item $M$ and $N$ are themselves terms
+        \item An abstraction creates a function, an application calls it
+        % bound variables?
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{$\beta$-reduction}
+    \begin{itemize}
+        \item Lambda calculus terms can be simplified by \textbf{$\beta$-reduction}
+        \item $(\lambda x. M) N \to_\beta M[N/x]$
+        \item Substitution only replaces free instances of $x$
+        \item \textbf{$\beta$-normal form:} the form a term has when it can't be $\beta$-reduced anymore
+        \item \textbf{Church-Rosser property:} guarantees all terms which have a $\beta$-normal form have a unique $\beta$-normal form
+        \item Are there terms without $\beta$-normal forms at all?
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Infinite $\beta$-reduction}
+    \begin{itemize}
+        \item $(\lambda x. xx)(\lambda x. xx) \newline
+        \to_\beta (\lambda x. xx)(\lambda x. xx) \newline
+        \to_\beta (\lambda x. xx)(\lambda x. xx) \newline
+        \to_\beta ...$
+        \item If the lambda calculus is a programming language, this means some programs never terminate!
+        \item Problem: any function can take any kind of input
+        \item How can we prevent this?
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Simply-typed lambda calculus}
+    \begin{itemize}
+        \item Add types to untyped lambda calculus
+        \item \textbf{Type:} hard to define, but every term has exactly 1 type
+        \begin{itemize}
+            \item Basic types: $0$ (no terms) and $1$ (1 term: $*$)
+            \item Function type: $A \to B$ where $A$ and $B$ are types
+            \item $|A \to B| = |B|^{|A|}$
+        \end{itemize}
+        \item Untyped lambda calculus + the types shown above = \textbf{simply-typed lambda calculus}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Simply-typed lambda calculus}
+    \begin{itemize}
+        \item Abstractions look different: $\lambda x^A.M$ where $A$ is $x$'s type
+        \item Application arguments much match the abstraction's parameter's type
+        \item \textbf{Strong normalization:} every term now has a $\beta$-normal form
+        \item $(\lambda x^{1 \to 1}. x*)*$ is invalid
+        \item $(\lambda x^{1 \to 1}. x*)(\lambda y^1. y)$ is valid
+        \item How can we determine what terms are well-typed?
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Typing rules}
+    \begin{prooftree}
+        \AxiomC{}
+        \RightLabel{$Ax$}
+        \UnaryInfC{$\Gamma, x: A \vdash x: A$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma, x: A \vdash M: B$}
+        \RightLabel{$\to I$}
+        \UnaryInfC{$\Gamma \vdash \lambda x^A. M: A \to B$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash M: A \to B$}
+        \AxiomC{$\Gamma \vdash N: A$}
+        \RightLabel{$\to E$}
+        \BinaryInfC{$\Gamma \vdash MN: B$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{}
+        \RightLabel{$1I$}
+        \UnaryInfC{$\Gamma \vdash *: 1$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash M: 0$}
+        \RightLabel{$0E$}
+        \UnaryInfC{$\Gamma \vdash \text{abort}_A M: A$}
+    \end{prooftree}
+\end{frame}
+
+% maybe instead of "constructive" say "direct, not indirect reasoning"
+\begin{frame}{Natural deduction}
+    \begin{itemize}
+        \item \textbf{Natural deduction:} a proof calculus based on inference rules rather than axioms
+        \item \textbf{Proposition:} a statement with a truth value
+        \begin{itemize}
+            \item Basic proposition: $A$
+            \item Implication: $A \implies B$ where $A$ and $B$ are propositions
+        \end{itemize}
+        \item We will use NJ, which is based on \textbf{intuitionistic logic}
+        \item No law of excluded middle or double negation elimination
+        \item Meant to encourage constructive proofs
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Inference rules}
+    \begin{prooftree}
+        \AxiomC{}
+        \RightLabel{$Ax$}
+        \UnaryInfC{$\Gamma, x: A \vdash x: A$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash B$}
+        \RightLabel{$\implies I_v$}
+        \UnaryInfC{$\Gamma \vdash A \implies B$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma, x: A \vdash B$}
+        \LeftLabel{$x$}
+        \RightLabel{$\implies I_s$}
+        \UnaryInfC{$\Gamma \vdash A \implies B$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash A \implies B$}
+        \AxiomC{$\Gamma \vdash A$}
+        \RightLabel{$\implies E$}
+        \BinaryInfC{$\Gamma \vdash B$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{}
+        \RightLabel{$\top I$}
+        \UnaryInfC{$\Gamma \vdash \top$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash \bot$}
+        \RightLabel{$\bot E$}
+        \UnaryInfC{$\Gamma \vdash A$}
+    \end{prooftree}
+\end{frame}
+
+\begin{frame}{Detour elimination}
+    \begin{itemize}
+        \item \textbf{Detour:} an introduction rule followed immediately by an elimination rule
+        \begin{prooftree}
+            \AxiomC{$\Gamma \vdash B$}
+            \RightLabel{$\implies I_v$}
+            \UnaryInfC{$\Gamma \vdash \top \implies B$}
+            \AxiomC{}
+            \RightLabel{$\top I$}
+            \UnaryInfC{$\Gamma \vdash \top$}
+            \RightLabel{$\implies E$}
+            \BinaryInfC{$\Gamma \vdash B$}
+        \end{prooftree}
+        \item All this proves is B, given B
+        \item A proof with no detours is \textbf{normal}
+        \item \textbf{Confluence:} every proof that has a normal form has a unique normal form
+        \item \textbf{Strong normalization:} every proof has a normal form
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{The correspondence}
+    \renewcommand{\arraystretch}{2}
+    \resizebox{\linewidth}{!}{
+        \begin{tabular}{c c}
+            \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{}
+                    \RightLabel{$Ax$}
+                    \UnaryInfC{$\Gamma, x: A \vdash x: A$}
+                \end{prooftree}
+            \end{minipage} & \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{}
+                    \RightLabel{$Ax$}
+                    \UnaryInfC{$\Gamma, x: A \vdash x: A$}
+                \end{prooftree}
+            \end{minipage} \\
+            What goes here? & \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{$\Gamma \vdash B$}
+                    \RightLabel{$\implies I_v$}
+                    \UnaryInfC{$\Gamma \vdash A \implies B$}
+                \end{prooftree}
+            \end{minipage} \\
+            \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{$\Gamma, x: A \vdash M: B$}
+                    \RightLabel{$\to I$}
+                    \UnaryInfC{$\Gamma \vdash \lambda x^A. M: A \to B$}
+                \end{prooftree}
+            \end{minipage} & \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{$\Gamma, x: A \vdash B$}
+                    \LeftLabel{$x$}
+                    \RightLabel{$\implies I_s$}
+                    \UnaryInfC{$\Gamma \vdash A \implies B$}
+                \end{prooftree}
+            \end{minipage} \\
+            \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{$\Gamma \vdash M: A \to B$}
+                    \AxiomC{$\Gamma \vdash N: A$}
+                    \RightLabel{$\to E$}
+                    \BinaryInfC{$\Gamma \vdash MN: B$}
+                \end{prooftree}
+            \end{minipage} & \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{$\Gamma \vdash A \implies B$}
+                    \AxiomC{$\Gamma \vdash A$}
+                    \RightLabel{$\implies E$}
+                    \BinaryInfC{$\Gamma \vdash B$}
+                \end{prooftree}
+            \end{minipage} \\
+            \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{}
+                    \RightLabel{$1I$}
+                    \UnaryInfC{$\Gamma \vdash *: 1$}
+                \end{prooftree}
+            \end{minipage} & \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{}
+                    \RightLabel{$\top I$}
+                    \UnaryInfC{$\Gamma \vdash \top$}
+                \end{prooftree}
+            \end{minipage} \\
+            \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{$\Gamma \vdash M: 0$}
+                    \RightLabel{$0E$}
+                    \UnaryInfC{$\Gamma \vdash \text{abort}_A M: A$}
+                \end{prooftree}
+            \end{minipage} & \begin{minipage}{0.55\textwidth}
+                \begin{prooftree}
+                    \AxiomC{$\Gamma \vdash \bot$}
+                    \RightLabel{$\bot E$}
+                    \UnaryInfC{$\Gamma \vdash A$}
+                \end{prooftree}
+            \end{minipage}
+        \end{tabular}
+    }
+\end{frame}
+
+\begin{frame}{The correspondence}
+    \begin{prooftree}
+        \AxiomC{}
+        \RightLabel{$Ax$}
+        \UnaryInfC{$\Gamma, x: \top \implies A \vdash \top \implies A$}
+        \AxiomC{}
+        \RightLabel{$\top I$}
+        \UnaryInfC{$\Gamma \vdash \top$}
+        \RightLabel{$\implies E$}
+        \BinaryInfC{$\Gamma, x: \top \implies A \vdash A$}
+        \LeftLabel{$x$}
+        \RightLabel{$\implies I_s$}
+        \UnaryInfC{$\Gamma \vdash (\top \implies A) \implies A$}
+    \end{prooftree}
+    
+    \begin{center}
+        \Huge{$\Updownarrow$}
+    \end{center}
+    
+    \begin{prooftree}
+        \AxiomC{}
+        \RightLabel{$Ax$}
+        \UnaryInfC{$\Gamma, x: 1 \to A \vdash x: 1 \to A$}
+        \AxiomC{}
+        \RightLabel{$1 I$}
+        \UnaryInfC{$\Gamma \vdash *: 1$}
+        \RightLabel{$\to E$}
+        \BinaryInfC{$\Gamma, x: 1 \to A \vdash x *: A$}
+        \RightLabel{$\to I$}
+        \UnaryInfC{$\Gamma \vdash \lambda x^{1 \to A}.x *: (1 \to A) \to A$}
+    \end{prooftree}
+\end{frame}
+
+\begin{frame}{Product types}
+    \begin{itemize}
+        \item \textbf{Product type:} $A \times B$ where $A$ and $B$ are types
+        \item A pair of 2 terms, with the ability to extract each part from the whole
+        \item $|A \times B| = |A| \times |B|$
+    \end{itemize}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash M: A$}
+        \AxiomC{$\Gamma \vdash N: B$}
+        \RightLabel{$\times I$}
+        \BinaryInfC{$\Gamma \vdash \langle M, N \rangle: A \times B$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash M: A \times B$}
+        \RightLabel{$\times E_1$}
+        \UnaryInfC{$\Gamma \vdash \pi_1 M: A$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash M: A \times B$}
+        \RightLabel{$\times E_2$}
+        \UnaryInfC{$\Gamma \vdash \pi_2 M: B$}
+    \end{prooftree}
+\end{frame}
+
+\begin{frame}{Conjunctions}
+    \begin{itemize}
+        \item \textbf{Conjunction:} $A \land B$ where $A$ and $B$ are propositions
+        \item ``Logical AND''
+        \item Both propositions are true, and each one is true separately
+    \end{itemize}
+
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash A$}
+        \AxiomC{$\Gamma \vdash B$}
+        \RightLabel{$\land I$}
+        \BinaryInfC{$\Gamma \vdash A \land B$}
+    \end{prooftree}
+
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash A \land B$}
+        \RightLabel{$\land E_1$}
+        \UnaryInfC{$\Gamma \vdash A$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash A \land B$}
+        \RightLabel{$\land E_2$}
+        \UnaryInfC{$\Gamma \vdash B$}
+    \end{prooftree}
+\end{frame}
+
+\begin{frame}{Product types and conjunction}
+    \begin{itemize}
+        \item Both are combinations of 2 things, and you can ``extract'' each part
+        \item Conjunctions with false are all false: $A \land \bot \iff \bot$...
+        \item and products with 0 don't exist: $A \times 0 = 0$
+        \item Conjunctions with true do nothing: $A \land \top \iff A$...
+        \item and products with 1 are pointless: $A \times 1 = A$
+    \end{itemize}
+\end{frame}
+
+% mention its a disjoint sum
+\begin{frame}{Sum types}
+    \begin{itemize}
+        \item \textbf{Sum type:} $A + B$ where $A$ and $B$ are types
+        \item Either an $A$ or a $B$, with a ``tag'' that tells you which one it is
+        \item $|A + B| = |A| + |B|$
+    \end{itemize}
+
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash M: A$}
+        \RightLabel{$+ I_1$}
+        \UnaryInfC{$\Gamma \vdash \text{inj}_1 M: A + B$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash M: B$}
+        \RightLabel{$+ I_2$}
+        \UnaryInfC{$\Gamma \vdash \text{inj}_2 M: A + B$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash M: A + B$}
+        \AxiomC{$\Gamma, x: A \vdash N: C$}
+        \AxiomC{$\Gamma, y: B \vdash O: C$}
+        \RightLabel{$+ E$}
+        \TrinaryInfC{$\Gamma \vdash \text{case } M \text{ of } (x)N; (y)O: C$}
+    \end{prooftree}
+\end{frame}
+
+\begin{frame}{Disjunction}
+    \begin{itemize}
+        \item \textbf{Disjunction:} $A \lor B$ where $A$ and $B$ are propositions
+        \item ``Logical OR''
+        \item At least 1 proposition is true, but we can't always tell which one
+    \end{itemize}
+
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash A$}
+        \RightLabel{$\lor I_1$}
+        \UnaryInfC{$\Gamma \vdash A \lor B$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash B$}
+        \RightLabel{$\lor I_2$}
+        \UnaryInfC{$\Gamma \vdash A \lor B$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash A \lor B$}
+        \AxiomC{$\Gamma, x: A \vdash C$}
+        \AxiomC{$\Gamma, y: B \vdash C$}
+        \LeftLabel{$x, y$}
+        \RightLabel{$\lor E$}
+        \TrinaryInfC{$\Gamma \vdash C$}
+    \end{prooftree}
+\end{frame}
+
+% add parentheses in distributivty
+\begin{frame}{Sum types and disjunction}
+    \begin{itemize}
+        \item Commutative: $A + B = B + A$ and $A \lor B \iff B \lor A$
+        \item Associative: $(A + B) + C = A + (B + C)$ and $(A \lor B) \lor C \iff A \lor (B \lor C)$
+        \item Identity element: $A + 0 = A$ and $A \lor \bot \iff A$
+        \item Distributive: $A \times (B + C) = A \times B + A \times C$ and $A \land (B \lor C) \iff A \land B \lor A \land C$
+        \item Dual to products and conjunctions
+    \end{itemize}
+\end{frame}
+
+% is it really "2nd order NJ?"
+\begin{frame}{Limitations of STLC and NJ}
+    \begin{itemize}
+        \item Can't express universals
+        \item No single function $\lambda x^A.x$ exists for all types $A$
+        \item $A \implies A$, $B \implies B$, etc. all have to be proven separately
+        \item STLC + polymorphism = \textbf{System F}
+        \item NJ + universal quantification = \textbf{2nd-order NJ}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{System F}
+    \begin{itemize}
+        \item \textbf{Universal type:} $\forall \alpha. A$ where $A$ is a type
+        \item Functions that take a type and return a term: $\Lambda \alpha. \lambda x^\alpha. x: \forall \alpha. \alpha \to \alpha$
+        \item New $\beta$-reduction rule: $(\Lambda \alpha. A) B \to_\beta A[B/\alpha]$
+        \item Still Church-Rosser and strongly normalizing
+    \end{itemize}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash M: A$}
+        \AxiomC{$\alpha \not\in FTV(\Gamma)$}
+        \RightLabel{$\forall I$}
+        \BinaryInfC{$\Gamma \vdash \Lambda \alpha. M: \forall \alpha. A$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash \Lambda \alpha. M: \forall \alpha. A$}
+        \RightLabel{$\forall E$}
+        \UnaryInfC{$\Gamma \vdash M: A[B/\alpha]$}
+    \end{prooftree}
+\end{frame}
+
+\begin{frame}{2nd-order NJ}
+    \begin{itemize}
+        \item \textbf{Universal quantifier:} $\forall \alpha. A$ where $A$ is a proposition
+        \item ``For all $\alpha$, $A$''
+    \end{itemize}
+
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash A$}
+        \AxiomC{$\alpha \not\in FV(\Gamma)$}
+        \RightLabel{$\forall I$}
+        \BinaryInfC{$\Gamma \vdash \forall \alpha. A$}
+    \end{prooftree}
+    
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash \forall \alpha.A$}
+        \RightLabel{$\forall E$}
+        \UnaryInfC{$\Gamma \vdash A[B/\alpha]$}
+    \end{prooftree}
+    
+    \begin{itemize}
+        \item New introduction and elimination rule means new type of detour:
+    \end{itemize}
+
+    \begin{prooftree}
+        \AxiomC{$\Gamma \vdash A$}
+        \AxiomC{$\alpha \not\in FV(\Gamma)$}
+        \RightLabel{$\forall I$}
+        \BinaryInfC{$\Gamma \vdash \forall \alpha. A$}
+        \RightLabel{$\forall E$}
+        \UnaryInfC{$\Gamma \vdash A[B/\alpha]$}
+    \end{prooftree}
+\end{frame}
+
+\begin{frame}{The identities}
+    \begin{itemize}
+        \item The connectives follow 14 identities:
+    \end{itemize}
+
+    \begin{multicols}{2}
+        \begin{enumerate}
+            \item $0 + x = x$
+            \item $x + y = y + x$
+            \item $(x + y) + z = x + (y + z)$
+            \item $x \times 0 = 0$
+            \item $x \times 1 = x$
+            \item $x \times y = y \times x$
+            \item $(x \times y) \times z = x \times (y \times z)$
+            \item $x \times (y + z) = x \times y + x \times z$
+            \item $0 \to x = 1$
+            \item $x \to 1 = 1$
+            \item $1 \to x = x$
+            \item $x + y \to z = (x \to z) \times (y \to z)$
+            \item $x \to y \times z = (x \to y) \times (x \to z)$
+            \item $x \to y \to z = x \times y \to z$
+        \end{enumerate}
+    \end{multicols}
+    
+    \begin{itemize}
+        \item (Keep in mind $|A \to B| = |B|^{|A|}$)
+        \item What algebraic structure do these operations and axioms create?
+    \end{itemize}
+\end{frame}
+
+% dont worry too much about exponential/product/coproduct, just say they behave like functions, cartesian products, and disjoint union
+\begin{frame}{Categories}
+    \begin{itemize}
+        \item A Bicartesian closed category... what is that?
+        \item \textbf{Category:} a collection of objects and morphisms
+        \item They can be many things:
+        \begin{itemize}
+            \item Sets and functions
+            \item Vector spaces and linear transformations
+            \item Groups and group homomorphisms
+        \end{itemize}
+        \item Morphisms must be composable: $f: A \to B$ and $g: B \to C$ means there must be $g \circ f: A \to C$
+        \item Every object needs an identity morphism $id_A: A \to A$ which acts as an identity for composition
+    \end{itemize}
+\end{frame}
+
+% explain what a BCC is here: it has exponential, product, and sum objects for all pairs of objects, and an initial and terminal object
+% include NOTHING from theorem proving section, maybe mention system f in the context of software engineering and how lambda calc based type systems make functional languages special
+\begin{frame}{Lambek}
+    \begin{itemize}
+        \item Category theoretic contributions made by Joachim Lambek
+        \item True name of the correspondence: \textbf{Curry-Howard-Lambek}
+    \end{itemize}
+    
+    \renewcommand{\arraystretch}{1.5}
+    \resizebox{\linewidth}{!}{
+        \begin{tabular}{c c c c c}
+            STLC & $\iff$ & NJ & $\iff$ & Bicartesian closed category \\
+            Term & $\iff$ & Proof & $\iff$ & Morphism \\
+            Type & $\iff$ & Proposition & $\iff$ & Object \\
+            Typing rule & $\iff$ & Inference rule & $\iff$ & Categorical axiom \\
+            $\beta$-reduction & $\iff$ & Detour elimination & $\iff$ & Morphism composition \\
+            1 & $\iff$ & $\top$ & $\iff$ & Terminal object \\
+            0 & $\iff$ & $\bot$ & $\iff$ & Initial object \\
+            Function type & $\iff$ & Implication & $\iff$ & Exponential object \\
+            Product type & $\iff$ & Conjunction & $\iff$ & Product \\
+            Sum type & $\iff$ & Disjunction & $\iff$ & Coproduct
+        \end{tabular}
+    }
+\end{frame}
+
+\begin{frame}{Lambek}
+    \begin{itemize}
+        \item Why is Lambek left out of most discussions of the correspondence?
+        \begin{itemize}
+            \item Logic lets you prove theorems
+            \item Type systems let you write safe programs
+            \item What can categories do for the average mathematician?
+        \end{itemize}
+        \item Why is it useful despite that?
+        \begin{itemize}
+            \item STLC and NJ are pure syntax
+            \item BCCs provide semantics as mathematical objects that model them
+            \item Category theory lets us reason about these systems more abstractly and generally
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{}
+    \begin{center}
+        \Huge{Questions?}
+    \end{center}
+\end{frame}
+
+\begin{frame}{}
+    \begin{center}
+        \Huge{Thank you}
+    \end{center}
+\end{frame}
+
+\end{document}

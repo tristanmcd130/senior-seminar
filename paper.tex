@@ -1,0 +1,811 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[margin=1in]{geometry}
+\usepackage{bussproofs}
+\usepackage{setspace}
+\renewcommand{\baselinestretch}{2}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{multicol}
+\usepackage[style=alphabetic]{biblatex}
+\usepackage{indentfirst}
+\usepackage{hyperref}
+
+\addbibresource{references.bib}
+
+\hypersetup{
+    linktoc=all
+}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\title{Curry-Howard Correspondence}
+\author{Tristan McDermott \\ Advisor: Tibor Beke}
+\date{December 10, 2025}
+
+\begin{document}
+
+\maketitle
+
+\pagebreak
+
+\section{Abstract}
+
+In this paper, we explore the Curry-Howard correspondence, which establishes a deep, multi-layered connection between logic and type theory: between propositions and types, inference rules and typing rules, and proofs and programs. We show that simply-typed lambda calculus and intuitionistic natural deduction are analogous to each other, then discuss classical logic and its equivalent before moving on to System F and second-order natural deduction. We use the correspondence to prove a mathematical theorem in a real programming language. Finally, we briefly discuss category theory and how it underlies both sides of the correspondence.
+
+\section{Acknowledgments}
+
+My deepest gratitude goes to my advisor, Professor Tibor Beke, for encouraging my enthusiasm and helping make this paper what it is.
+
+\tableofcontents
+
+\section{Introduction}
+
+It is quite difficult to describe the Curry-Howard correspondence in terms of what it ``is'' rather than what it ``does.'' I would say it shows that logic and type theory are analogous to each other. It's often expressed by slogans like ``proofs are programs,'' ``propositions are types,'' etc. which, while true, tend to obscure how deep the relationship between these 2 fields really is.
+
+In 1958, Haskell Curry noticed a correspondence between typed combinatory logic and intuitionistic logic \cite{curry}. While this was significant, combinatory logic is not very relevant in modern mathematics, and so explaining the correspondence from Curry's perspective might not be very helpful.
+
+In 1969, William Howard added onto the correspondence when he noticed it between typed lambda calculus and intuitionistic logic \cite{howard}. Lambda calculus, on top of being a lot simpler than combinatory logic, is also much more relevant and well-known today, especially to computer scientists. This is the lens through which we will be examining the type theory half of the correspondence.
+
+What these 2 put on the logical side of the correspondence wasn't really just intuitionistic logic, but rather a proof calculus based on intuitionistic logic. Curry used Hilbert-style deduction while Howard used natural deduction. How these 2 systems differ is that Hilbert-style deduction focuses on axioms while usually only having 1 inference rule (modus ponens), while natural deduction focuses on inference rules while only having 1 axiom (introduction of assumptions). Given that natural deduction is what Howard noticed lambda calculus corresponds to, that is how we will examine the logical part of the correspondence.
+
+\section{Untyped lambda calculus}
+
+The lambda calculus is a formal language centered around functions. It can essentially be thought of as the simplest possible programming language, even though (on the surface) it has nothing to do with computers. Lambda calculus terms come in 3 possible forms: a variable $x$ whose name comes from some infinite set of variable names, an abstraction (function) $\lambda x. M$, or an application (function call) $M N$. In the last 2 forms, $M$ and $N$ are themselves lambda terms. Application associates to the left, so $M N O$ is $(M N) O$ and not $M (N O)$, and it has a higher precedence than abstraction, so $\lambda x. M N$ is $\lambda x. (M N)$ and not $(\lambda x. M) N$. Nested abstractions can be abbreviated slightly: $\lambda x. \lambda y. \lambda z. M$ can be written as $\lambda xyz. M$. Essentially, it can be thought of as a function that takes multiple arguments instead of just 1 \cite{selinger}.
+
+Variables in lambda terms can be either free or bound. The only way for a variable to become bound is to serve as a parameter to an abstraction: in $\lambda x. M$, $x$ is bound within the abstraction's body, $M$ (assume that $M$ is some more complex lambda term which contains $x$). Outside of $M$, $x$ is free. For any lambda term, we can determine the set of all free variables by doing case analysis on the term's 3 possible forms: \\
+\\
+$FV(x) = \{x\} \\
+FV(M N) = FV(M) \cup FV(N) \\
+FV(\lambda x. M) = FV(M) - \{x\} \\$
+
+All variables are assumed to be free until something which binds it is found. Much like conventional mathematical expressions, lambda terms can be evaluated or reduced into simpler forms. A technique used for reduction is substitution, which is defined as follows: \\
+\\
+$x[N/x] = N \\
+y[N/x] \text{ where $y$ is a variable different from $x$} = y \\
+(L M)[N/x] = L[N/x] M[N/x] \\
+(\lambda x. M)[N/x] = \lambda x. M \\
+(\lambda y. M)[N/x] \text{ where $y \ne x$} = \lambda y. (M[N/x]) \\$
+
+$M[N/x]$ should be understood as ``in $M$, all \textit{free} instances of $x$ are replaced with $N$.'' The last 2 cases show that it is only free instances that are replaced: if we encounter an abstraction that binds $x$, all the instances of $x$ within the abstraction body are essentially a different $x$ than the one we're looking for, and so they are not substituted.
+
+Having defined substitution, we can now define a reduction rule for the lambda calculus: $\beta$-reduction. It is a binary relation $\to_\beta$ between 2 lambda terms, defined with the following as its only case: $(\lambda x. M)N \to_\beta M[N/x]$. An abstraction can be applied by substituting the formal parameter with the given argument inside the body. This mostly tracks with how we as humans evaluate mathematical functions. If we define $f(x) = x^3 + \sin(x)$ and want to evaluate $f(5)$, we take the body of $f$ and substitute all instances of $x$ with 5: $f(5) = 5^3 + \sin(5)$. The major differences here are that mathematical functions must be named and can't have functions defined within their bodies.
+
+If we keep performing $\beta$-reduction on a term until it cannot be applied anymore, the end result is said to be in $\beta$-normal form. While not every lambda term has a $\beta$-normal form, as we will see later, there is a particularly useful property known as the Church-Rosser property which guarantees that all lambda terms which have $\beta$-normal forms have exactly 1 unique $\beta$-normal form. Formally speaking, if a term $M$ can be $\beta$-reduced to both $N_1$ and $N_2$, then there exists a term $L$ such that $N_1 \to_\beta L$ and $N_2 \to_\beta L$. This allows us to reduce a lambda term in any order we like: if we have a term with nested applications of abstractions, like $(\lambda x. (\lambda y. y y) x) z$, we can either reduce the outer application first to get $(\lambda y. y y) z \to_\beta zz$ or reduce the inner one first to get $(\lambda x. xx) z \to_\beta zz$. Either way, it's the same. In an actual programming language, computational side effects mean that this almost always isn't the case and the order of evaluation can greatly affect the final result, but with such a pure and abstract system like lambda calculus, we're free to do it however we want.
+
+Another relation that is useful during reduction is $\alpha$-equivalence, which says that 2 terms are equivalent if they only differ by the name of their bound variables. Due to it relying on bound variables, it really only applies to abstractions. Formally, $\lambda x. M =_\alpha \lambda y.(M[y/x])$. This assumes that $y$ doesn't occur in $M$, as if it did, it would be easy to see that $\lambda x. y$ and $\lambda y. y$ are different. In the first term, $y$ is presumably bound by some outer, unseen abstraction, and so that term would take some argument $x$, discard it, and then return $y$. The second term takes an argument $y$ and returns it unmodified.
+
+\section{Simply-typed lambda calculus}
+
+While the lambda calculus as we just presented it does have Church-Rosser to guarantee that every term with a $\beta$-normal form has a unique $\beta$-normal form, it doesn't guarantee that every term has a $\beta$-normal form to begin with. Let's look at a certain term and its reduction: \\
+\\
+$(\lambda x. x x)(\lambda x. x x) \\
+\to_\beta (\lambda x. x x) (\lambda x. x x) \\
+\to_\beta (\lambda x. x x) (\lambda x. x x) \\
+\to_\beta ... \\$
+
+This term infinitely reduces to itself, never finishing its evaluation. If we think of the lambda calculus as a programming language, this obviously has disastrous consequences: there are some programs that will never finish running.
+
+The lambda calculus has another big problem, which is that any term can be used as an argument to any abstraction, making it hard to assign meaning to some terms. What does a lambda term like $\lambda nsz.s(nsz)$ mean, and what does it do? Who knows. Quite simply put, the lambda calculus forgets the fact that functions are supposed to have domains and codomains: acceptable sets of inputs and outputs. It would be surprising to find out that the result of plugging a real number into $x^5 - x - 1$ is sometimes a real number, sometimes a set, sometimes a quaternion, etc. but in the lambda calculus, this is essentially the case for every function. You can plug anything into anything and get anything out of it.
+
+To fix these problems, we can introduce types to lambda calculus. Defining what exactly a type is is difficult, and for now, all that needs to be known about them is that they come in certain forms, and every lambda calculus term has exactly 1 type. We will start by giving the lambda calculus a very simple type system and expand it as this paper continues. In the simplest possible type system, types have 2 possible forms: $\iota$, a basic type, or $A \to B$ where $A$ and $B$ are both themselves types. $\to$ associates to the right, so $A \to B \to C$ is $A \to (B \to C)$ and not $(A \to B) \to C$. Adding this type system to untyped lambda calculus (ULC) gives the simply-typed lambda calculus, which will from here on out be referred to as STLC.
+
+In untyped lambda calculus, strictly speaking everything is a function: applications can be reduced via $\beta$-reduction and their endpoint, if they have one, is a function; abstractions are functions which can sometimes be reduced, but they'll ultimately always stay as functions; and variables refer to the other 2 forms, making them functions too. Adding basic non-function types to lambda calculus thus also necessitates adding new forms for the terms of those types to take. We will add the types 1 (sometimes also called ``unit''), which only has 1 term denoted $*$, and 0 (sometimes also called ``void''), which has no terms at all.
+
+Lambda abstractions in STLC also take a slightly different form than in ULC: $\lambda x^A.M$ where $A$ is a type. In an application, the applied argument must be of type $A$, otherwise it is not valid. An application like $(\lambda x^{1 \to 1}. x *) *$ is not a valid, well-typed STLC term because the unit value is not of type $1 \to 1$. Rules like these are known as typing rules, and STLC only has 5:
+
+\begin{prooftree}
+    \AxiomC{}
+    \RightLabel{$Ax$}
+    \UnaryInfC{$\Gamma, x: A \vdash x: A$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma, x: A \vdash M: B$}
+    \RightLabel{$\to I$}
+    \UnaryInfC{$\Gamma \vdash \lambda x^A. M: A \to B$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: A \to B$}
+    \AxiomC{$\Gamma \vdash N: A$}
+    \RightLabel{$\to E$}
+    \BinaryInfC{$\Gamma \vdash MN: B$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{}
+    \RightLabel{$1I$}
+    \UnaryInfC{$\Gamma \vdash *: 1$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: 0$}
+    \RightLabel{$0E$}
+    \UnaryInfC{$\Gamma \vdash \text{abort}_A M: A$}
+\end{prooftree}
+
+These rules are structured as a big conditional. The premises are above the bar, and the conclusion is below it. The name of the rule is to the right of the bar. Each part of the rule is known as a typing judgment. To the left of the turnstyle in each judgment is the typing context, which keeps track of bound variables and their types. If there are variables whose types we don't particularly care about, we put them into $\Gamma$. If a variable's type is relevant in a rule, we can show it explicitly: $x: A$ means ``the variable $x$ has type $A$.'' To the right of the turnstyle is a type and a term of that type.
+
+The very first rule, $Ax$, is the only rule that can be used without any prerequisites. It lets us introduce a new variable, $x$, with type $A$. The $\to I$ (``function introduction'') rule says that as long as we can have a variable of type A, we can create an abstraction which takes an $A$ and returns a $B$. The $\to E$ (``function elimination'') rule ensures that only functions can be in the left slot of an application, and that only a term whose type matches that of the function's parameter can be in the right slot. The $1I$ (``unit introduction'') rule simply says that the unit value has type 1. Finally, for the $0E$ (``void elimination'') rule we introduce another new form for terms called abort, which can be thought of as a function. This function takes a parameter of type 0 and can return a term of any type we choose. Justifying its existence based only on what we have here is difficult. How exactly do you pass a void term to a function if that type has no terms to begin with? In some programming languages like Haskell, the void type is seen as the type of non-terminating computations, but in STLC, those don't exist, so what is 0 exactly? What I just said, plus the existence of abort, should give you a hint. If we somehow have a term of a type which by definition has no terms, something has gone really wrong. If this is the case, we can pass it into abort to essentially signal an error. We can get anything we want out of abort, which we can think of as a reward for doing the impossible.
+
+% How does abort interact with evaluation i.e. beta reduction?
+
+Adding types to lambda calculus fixes the 2 major problems of ULC: a term can't be applied to itself since that wouldn't be well-typed, which means that every term reduces to something and then stops, which in turn implies that every term has a $\beta$-normal form. This property is known as strong normalization. Church-Rosser still applies, so in STLC, every term has a $\beta$-normal form, and it is unique \cite{selinger}.
+
+\section{Intuitionistic natural deduction}
+
+Natural deduction is a proof calculus where proofs are done mainly by applying inference rules rather than axioms. Natural deduction proofs can be thought of as trees, with the ultimate goal you're trying to prove as the roots, the initial axioms or assumptions as the leaves, and the intermediate steps as the branches.
+
+An inference rule is a rule that allows you to transform 0 or more premises into a conclusion. They let you take proofs of some things and use them to create a proof of something else. A proof with no premises is called a tautology. What's being proven is always true. The things that are being proven, or assumed to be true as part of a proof, are called propositions. A proposition takes 1 of 2 forms: either $A$, a basic statement with a truth value, or $A \implies B$, where $A$ and $B$ are themselves propositions. $\implies$ (``implies'') is called a connective since it connects 2 propositions, and for now it is the only one we will assume exists. $\implies$ associates to the right: $A \implies B \implies C$ means $A \implies (B \implies C)$, not $(A \implies B) \implies C$.
+
+Let's look at an example of an inference rule:
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A \implies B$}
+    \AxiomC{$\Gamma \vdash A$}
+    \BinaryInfC{$\Gamma \vdash B$}
+\end{prooftree}
+
+Hopefully this looks familiar, because natural deduction proofs take the exact same form as lambda calculus typing judgments. With that being true, there's not much to explain about them syntactically. Premises of the conditional come above the bar, and the conclusion below it. $\Gamma$ represents the set of unspoken, unnamed assumptions being made as part of the proof. Particularly important assumptions, ones important enough to actually be used in a proof, get annotated as $x: A$, which can be read as ``$x$ is the assumption that the proposition $A$ is true.'' Assumptions may only be used once, and once they are used, they are discharged. This is shown by the name of the assumption appearing to the left of the bar.
+
+The specific natural deduction system we will be using here is NJ, a system based on intuitionistic logic. Intuitionistic logic differs from classical logic in that it does not have the law of the excluded middle ($\forall A. A \lor \neg A$) or double negation elimination ($\forall A. \neg\neg A \iff A$) as axioms. The purpose of this type of logic is to enforce constructive proofs: in order to prove that an object with some property exists, instead of just proving that it can't not exist (proof by contradiction), you must show that it does exist by figuring out what it is. If you want to prove that a number with some certain property exists, it's not enough to merely say that it has to exist; you have to tell us what it is, or at least how to find it.
+
+Initially, we will assume the existence of only 1 logical connective, that being implication, as well as 2 basic propositions $\top$ (true) and $\bot$ (false). Like with STLC and its types, we will add more as the paper continues, but for now these are the inference rules relevant to us:
+
+\begin{prooftree}
+    \AxiomC{}
+    \RightLabel{$Ax$}
+    \UnaryInfC{$\Gamma, x: A \vdash x: A$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash B$}
+    \RightLabel{$\implies I_v$}
+    \UnaryInfC{$\Gamma \vdash A \implies B$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma, x: A \vdash B$}
+    \LeftLabel{$x$}
+    \RightLabel{$\implies I_s$}
+    \UnaryInfC{$\Gamma \vdash A \implies B$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A \implies B$}
+    \AxiomC{$\Gamma \vdash A$}
+    \RightLabel{$\implies E$}
+    \BinaryInfC{$\Gamma \vdash B$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{}
+    \RightLabel{$\top I$}
+    \UnaryInfC{$\Gamma \vdash \top$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash \bot$}
+    \RightLabel{$\bot E$}
+    \UnaryInfC{$\Gamma \vdash A$}
+\end{prooftree}
+
+Notice how there are different rules for introducing an implication based on whether it is done vacuously ($I_v$) or based on an assumption ($I_s$). Either way, if we can prove something is true, then anything implies it. Implication elimination is essentially modus ponens: if $A$ implies $B$ and $A$ is true, whether by assumption or because we have proven it, then $B$ is true. Finally, there is a truth introduction rule (truth is always true, and nothing is required to prove it) and a falsehood elimination rule (``ex falso quodlibet'': if we assume false is true, we can prove anything we want).
+
+Like lambda calculus, natural deduction proofs have a notion of reduction that allow us to put proofs in simpler forms.
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash B$}
+    \RightLabel{$\implies I_v$}
+    \UnaryInfC{$\Gamma \vdash \top \implies B$}
+    \AxiomC{}
+    \RightLabel{$\top I$}
+    \UnaryInfC{$\Gamma \vdash \top$}
+    \RightLabel{$\implies E$}
+    \BinaryInfC{$\Gamma \vdash B$}
+\end{prooftree}
+
+This proof says that if $B$ is true, then $B$ is true. Parts of a proof like this that use an introduction rule followed immediately by the corresponding elimination rule are called detours. A proof that contains no detours is called direct or normal. Like in the lambda calculus, it can be proven that every natural deduction proof can be reduced to a normal form, and that the order detours are removed in doesn't matter; in other words, NJ also has strong normalization and a property equivalent to Church-Rosser called confluence \cite{farooqui}.
+
+\section{The correspondence}
+
+On a fundamental level, typing rules ask the question of ``Can we prove that this type has any terms?'' and inference rules ask the question of ``Can we prove that this proposition is true?'' Types can have terms (be ``inhabited'') or not, and a proposition can be true or not. This should already give you an idea that STLC and NJ have deep similarities between them. But when we take a look at the rules themselves, it becomes very obvious that even the specific rules of both systems correspond to each other.
+
+Obviously, the rules both called $Ax$ correspond to each other. They are the only axioms (rules that can be applied with no prerequisites) present in both of these systems' rules. In STLC, it introduces a new variable $x: A$, and in NJ, it introduces a new assumption called $x$ which says that $A$ is true.
+
+The $\to I$ rule corresponds with $\implies I_s$. It says that if we have a term of type $B$, which depends on the variable $x$ of type $A$, we can create a function of type $A \to B$. An argument passed to this function will be substituted for $x$. Correspondingly, $\implies I_s$ says that if we have a proof of $B$ which assumes $A$ is true, we can discharge that assumption and create a proof of $A \implies B$.
+
+What about $I_v$? It's very similar to $I_s$, except that the implication is created vacuously, not based on any assumptions. Let's look at this from the STLC perspective: if we can prove $M: B$ just based on the typing context $\Gamma$ and we don't need $x: A$, that means the term $M$ doesn't depend on or use $x$. Thus, if we create a function that binds its argument to $x$, it will not be used. On the NJ side, if we don't need any particular assumptions to prove $B$, it doesn't matter what we say implies $B$; it's going to be true anyways since $\top \implies \top$ and $\bot \implies \top$.
+
+STLC's function elimination rule corresponds with NJ's implication elimination rule. $\to E$ says that given a function of type $A \to B$ and a suitable argument of type $A$, you can create a term of type $B$ by applying the function to its argument. $\implies E$ says that given a proof of $A \implies B$ and $A$, we can produce a proof of $B$ via modus ponens. More broadly, this and the previous rule show a correspondence between the implication connective in NJ and the function type in STLC. The fact that even their symbols ($\implies$ and $\to$) look similar isn't a coincidence \cite{howard}.
+
+$1I$ corresponds to $\top I$. Essentially, all these 2 rules say is ``there exists a thing called $*$/$\top$.'' Nothing is required to prove $*$ has type 1, and nothing is required to prove $\top$ is true.
+
+Finally, $0E$ corresponds with $\bot E$. $0E$ says that if we have a term of type 0, the type which has no terms, then we can use it to create a term of any type we want. $\bot E$ says that if we have a proof of $\bot$, the proposition which is never true, then we can use it to create a proof of anything we want: ``ex falso quodlibet.'' In this regard, these rules could be said to signal a kind of error situation. It's not possible to prove false is true, or to create a term of the type with no terms. If you ever have to use either of these rules, it's likely a sign something has gone wrong.
+
+It's not just the rules which show a correspondence between STLC and NJ. We explained earlier that both systems have a way to reduce terms to simpler forms: $\beta$-reduction for STLC and detour elimination for NJ. $\beta$-reduction can be applied when you introduce an abstraction and then immediately eliminate it with an application; detour elimination can be applied when you introduce an implication and then immediately eliminate it. And of course, implication is the only thing it applies to right now since it is the only connective that has both introduction and elimination rules. We've also shown that both of these systems have properties that say that every term can be reduced to the same form no matter which order you apply reductions in (Church-Rosser/confluence), and also that every term has a unique endpoint after repeatedly applying reductions (strong normalization).
+
+There's an even deeper level to this correspondence though, and it is what gives Curry-Howard real, practical importance to computer scientists and mathematicians alike. To see it, let's think about a simple logical theorem: $\forall A. (\top \implies A) \implies A$. It is valid under intuitionistic logic, but how do we prove it?
+
+\begin{prooftree}
+    \AxiomC{}
+    \RightLabel{$Ax$}
+    \UnaryInfC{$\Gamma, x: \top \implies A \vdash \top \implies A$}
+    \AxiomC{}
+    \RightLabel{$\top I$}
+    \UnaryInfC{$\Gamma \vdash \top$}
+    \RightLabel{$\implies E$}
+    \BinaryInfC{$\Gamma, x: \top \implies A \vdash A$}
+    \LeftLabel{$x$}
+    \RightLabel{$\implies I_s$}
+    \UnaryInfC{$\Gamma \vdash (\top \implies A) \implies A$}
+\end{prooftree}
+
+This proof is really only helpful insofar as it shows us what inference rule is being used at each step. However, we just said that the propositions and types, as well as the inference and typing rules, of NJ and STLC correspond with each other. What happens if we turn all the propositions into their corresponding lambda calculus types, and apply all the corresponding typing rules instead? We will have to make some additions, because typing judgments make you prove a type is inhabited by showing a term of that type. So, for each judgment where we have $\Gamma \vdash A$, we must create a lambda calculus term $M$ of type $A$ to turn it into $\Gamma \vdash M: A$. Doing that gives us this:
+
+\begin{prooftree}
+    \AxiomC{}
+    \RightLabel{$Ax$}
+    \UnaryInfC{$\Gamma, x: 1 \to A \vdash x: 1 \to A$}
+    \AxiomC{}
+    \RightLabel{$1 I$}
+    \UnaryInfC{$\Gamma \vdash *: 1$}
+    \RightLabel{$\to E$}
+    \BinaryInfC{$\Gamma, x: 1 \to A \vdash x *: A$}
+    \RightLabel{$\to I$}
+    \UnaryInfC{$\Gamma \vdash \lambda x^{1 \to A}.x *: (1 \to A) \to A$}
+\end{prooftree}
+
+This typing judgment ends with us creating a term of type $(1 \to A) \to A$, which means we have proven that type, which corresponds to a proposition, is inhabited. The correspondence thus allows us to create lambda calculus terms whose existence proves a logical proposition, just by following the typing rules. This is the principle that underlies a class of programming languages known as theorem provers. These languages use lambda calculus as their theoretical basis, and so they allow the user to prove a theorem by creating a term whose type corresponds to that theorem. Beyond just pure logic, these languages even allow you to prove mathematical theorems. Indeed, the first notable use of a theorem prover was to prove the 4 color theorem, which says that only 4 colors are needed to color the regions of a map such that no adjacent regions share the same color.
+
+The problem for us is that these theorem provers' power comes from their highly advanced type systems, which contain many features beyond just those of STLC. In this paper, we will only introduce 1 new feature to the type system that meaningfully increases the lambda calculus' theorem-proving power. We will have to stick to relatively simple theorems to prove, but as you will see, that doesn't mean everything we prove has to be a trivial logical tautology.
+
+\section{Product types and conjunction}
+
+Having now hopefully convinced you that there is a very deep correspondence between STLC and NJ, we will spend the next few sections of this paper expanding upon the very minimal versions of them we originally presented, adding more types/connectives and typing/inference rules. Prior to this, we talked about STLC and NJ in their own sections before explaining the correspondence between them, but from here on we'll be presenting both additions at roughly the same time.
+
+To STLC we will add a new form for types: $A \times B$ where $A$ and $B$ are types. This is the product type, which contains a term of type $A$ and another of type $B$. Its terms have a new form as well: $\langle M, N \rangle$ where $M: A$ and $N: B$. Given this description, writing a typing rule to introduce them is simple:
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: A$}
+    \AxiomC{$\Gamma \vdash N: B$}
+    \RightLabel{$\times I$}
+    \BinaryInfC{$\Gamma \vdash \langle M, N \rangle: A \times B$}
+\end{prooftree}
+
+The main thing about products is that they consist of 2 terms bundled together. Surely, we can extract them somehow in case we want to use the individual parts?
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: A \times B$}
+    \RightLabel{$\times E_1$}
+    \UnaryInfC{$\Gamma \vdash \pi_1 M: A$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: A \times B$}
+    \RightLabel{$\times E_2$}
+    \UnaryInfC{$\Gamma \vdash \pi_2 M: B$}
+\end{prooftree}
+
+With these elimination rules, we also introduce 2 new forms for terms: $\pi_1 M$ and $\pi_2 M$, which allow you to extract the left and right components from a product. Extracting the left component gives a term of the left type; extracting the right component gives a term of the right type. $\pi_1 \langle *, \lambda x^{1 \to 1} y^{1}.xy \rangle$ reduces to $*$, and $\pi_2 \langle *, \lambda x^{1 \to 1} y^{1}.xy \rangle$ to $\lambda x^{1 \to 1} y^{1}.xy$.
+
+Hopefully from this you can see how the product is similar to a Cartesian product: it is a pair of 2 terms, the left coming from 1 type (which could be thought of as a set) and the right coming from another. The number of terms of type $A \times B$ is precisely $|A| \times |B|$.
+
+In NJ, we will introduce a new form for propositions: $A \land B$ where $A$ and $B$ are propositions. This is conjunction, or the ``logical AND.''
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A$}
+    \AxiomC{$\Gamma \vdash B$}
+    \RightLabel{$\land I$}
+    \BinaryInfC{$\Gamma \vdash A \land B$}
+\end{prooftree}
+
+``If we can prove $A$ and $B$ are true, then we can prove that $A$ and $B$ is true.'' This is obvious, but the syntactic complexity of inference rules might not make it seem that way.
+
+Products could have their components extracted from them. Is this true of propositions too?
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A \land B$}
+    \RightLabel{$\land E_1$}
+    \UnaryInfC{$\Gamma \vdash A$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A \land B$}
+    \RightLabel{$\land E_2$}
+    \UnaryInfC{$\Gamma \vdash B$}
+\end{prooftree}
+
+Yes. If we know that both $A$ and $B$ are true, then both of them must be true individually.
+
+Product types and conjunction clearly correspond with each other across the 2 systems. They both consist of a combination of 2 terms, and each of those terms can be ``extracted'' from the whole. Let's now examine some other properties that these 2 connectives have.
+
+A consequence of the $\times E_1$/$\land E_1$ rule is that you can't have a product/conjunction involving 0/$\bot$. As a proposition, we could write this as $A \land \bot$, or as a type as $A \times 0$. When you AND anything with false, you get false; when you multiply anything by 0, you get 0. Also, a product involving 1/a conjunction involving $\top$ is pointless: $A \times 1 = A$, and anything ANDed with true is true.
+
+Products and conjunctions are also commutative and associative: if you have a term of type $A \times B$, you can turn it into a term of type $B \times A$ by simply switching the components around. If you have a term of type $A \times (B \times C)$, which would look like $\langle M, \langle N, O \rangle \rangle$, you can turn it into a $(A \times B) \times C$ by just moving the brackets: $\langle \langle M, N \rangle, O \rangle$. Since propositions don't have anything analogous to them in the way that terms are with types though, the only way you could show this is by using the inference rules to create a formal proof of $B \land A$ assuming $A \land B$, and of $(A \land B) \land C$ assuming $A \land (B \land C)$.
+
+What we can see from this is that products, true to their name, follow the same rules that multiplication in math does. What's curious about this though is the fact that in any sort of algebraic structure with multiplication as an operation, no matter what set it's over: positive integers, real numbers, sets, etc. multiplication following these rules is an axiom. You can't prove that $\forall x, y \in \mathbb{R}. xy = yx$: when defining the real numbers, you just say ``multiplication is an operation which is commutative, associative, distributive over addition, etc.'' In typed lambda calculus though, these are not inherently baked into the definition of the product, but rather they emerge as a consequence of the typing rules involving products.
+
+\begin{prooftree}
+    \AxiomC{}
+    \RightLabel{$Ax$}
+    \UnaryInfC{$\Gamma, x: A \times 0 \vdash x: A \times 0$}
+    \RightLabel{$\times E_2$}
+    \UnaryInfC{$\Gamma, x: A \times 0 \vdash \pi_2 x: 0$}
+    \RightLabel{$\to I$}
+    \UnaryInfC{$\Gamma \vdash \lambda x^{A \times 0}. \pi_2 x: A \times 0 \to 0$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{}
+    \RightLabel{$Ax$}
+    \UnaryInfC{$\Gamma, x: 0 \vdash x: 0$}
+    \RightLabel{$0 E$}
+    \UnaryInfC{$\Gamma, x: 0 \vdash \text{abort}_A x: A$}
+    \AxiomC{}
+    \RightLabel{$Ax$}
+    \UnaryInfC{$\Gamma, x: 0 \vdash x: 0$}
+    \RightLabel{$\times I$}
+    \BinaryInfC{$\Gamma, x: 0 \vdash \langle \text{abort}_A x, x \rangle: A \times 0$}
+    \RightLabel{$\to I$}
+    \UnaryInfC{$\Gamma \vdash \lambda x^0. \langle \text{abort}_A x, x \rangle: 0 \to A \times 0$}
+\end{prooftree}
+
+The above is a proof of the equality of the $A \times 0$ and 0 types. The first typing judgment proves the existence of a function that turns any $A \times 0$ it's given into a 0, and the second proves the other direction. Of course, there are no terms of type 0, so we must denote any terms of that type generically as a variable and assume their existence.
+
+Products and conjunctions actually satisfy 2 other properties, but they involve functions and implication. The first is: $A \to B \times C = (A \to B) \times (A \to C)$ and $A \implies B \land C \iff (A \implies B) \land (A \implies C)$. If you have a function that returns a product, you can split it into 2 functions, each of which returns 1 part of it; if something implies that 2 things are both true, then it implies each thing being true separately. The second property is: $A \to B \to C = A \times B \to C$ and $A \implies B \implies C \iff A \land B \implies C$. This property is especially useful to functional programmers, as it establishes a transformation called currying (after Haskell Curry, who gives this paper's topic half of its name). Lambda calculus, which most functional programming languages are based on, strictly speaking only allows functions to take 1 argument. You can sidestep this by making that single argument a product which contains the multiple values you really want. Currying allows you to instead create a function that returns a function that returns a function, etc. each one gathering 1 more argument until they've all been assembled, at which point the final expression can be evaluated. This allows for a technique called partial application, where a function can receive 1 argument at a time and ``wait'' until they've all been provided to return its final value, as opposed to requiring that they all be given at the same time in 1 function call.
+
+If we think about the properties I just presented as mathematical identities, we can see that where products/conjunctions correspond to multiplication, functions/implication correspond to exponentiation, but backwards: $A \to B = B^A$. How many possible functions are there from $A$ to $B$? For each possible argument of type $A$, we have $|B|$ many choices for what it evaluates to. So, there are $|B|^{|A|}$ many functions. This means that these 2 properties correspond with the mathematical axioms $(xy)^z = x^zy^z$ and $(x^y)^z = x^{yz}$. It could also be said that this interpretation of functions as exponentiation provides an answer to the long-running debate between mathematicians about the value of $0^0$. In STLC, the only term of this type is the identity function, $\lambda x^0. x$. Viewing a type as a natural number (its cardinality) thus gives us an answer of 1.
+
+\section{Sum types and disjunction}
+
+We shall now introduce yet another new form for STLC types: $A + B$ where $A$ and $B$ are types. This is the sum type, which contains either a term of type $A$ or type $B$. Unlike the product type, the sum type has 2 forms for introduction instead of just 1: $\text{inj}_1M$ and $\text{inj}_2M$. $\text{inj}_1$ and $\text{inj}_2$ are called constructors, and they are essentially a ``tag'' which tells you which side of the sum type this term contains. The term $\text{inj}_1 \langle *, * \rangle$ of type $1 \times 1 + 1$ contains a term of the left type, $1 \times 1$. $\text{inj}_2 *$ of the same type contains a term of the right type, $1$. However, the sum type also has only 1 elimination rule as opposed to the 2 of the product rule: $\text{case } M \text{ of } (x)N; (y)O$. If $M$'s constructor is $\text{inj}_1$, then it will bind the term inside to $x$ and evaluate $N$, which presumably depends on $x$. If $M$ was constructed by $\text{inj}_2$, it will bind the term inside to $y$ and evaluate $O$. Those familiar with functional programming will notice this is very similar, even syntactically, to the construct known as pattern matching, but restricted to operating only on sum types rather than the more general values most languages allow. Essentially, case is a conditional that lets you choose what to do to a sum based on which constructor was used to make it. Here are all the typing rules:
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: A$}
+    \RightLabel{$+ I_1$}
+    \UnaryInfC{$\Gamma \vdash \text{inj}_1 M: A + B$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: B$}
+    \RightLabel{$+ I_2$}
+    \UnaryInfC{$\Gamma \vdash \text{inj}_2 M: A + B$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: A + B$}
+    \AxiomC{$\Gamma, x: A \vdash N: C$}
+    \AxiomC{$\Gamma, y: B \vdash O: C$}
+    \RightLabel{$+ E$}
+    \TrinaryInfC{$\Gamma \vdash \text{case } M \text{ of } (x)N; (y)O: C$}
+\end{prooftree}
+
+Notice how you only need 1 inhabited type to construct a sum. The other type can be anything, even $0$ or a type equivalent to it like $0 \times 0$. Much like the product type, its symbol is derived from its cardinality: the type $A + B$ has as many valid terms as $|A| + |B|$. A sum doesn't exactly correspond to a union of sets, but rather a disjoint union: $A \sqcup B = \{(a, 0) | a \in A\} \cup \{(b, 1) | b \in B\}$. Each element is associated with a ``tag'' to show which set it's from, much like the constructors of a sum type. This way, if the 2 sets overlap, they can be distinguished: $\{1, 2\} \sqcup \{2, 3\} = \{(1, 0), (2, 0), (2, 1), (3, 1)\}$. However, in STLC, no types overlap since each term has exactly 1 type, so in practice it really is just a simple union.
+
+What we'll be adding to natural deduction is very similar. We'll add the new form for propositions $A \lor B$ where $A$ and $B$ are propositions. This is the logical OR.
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A$}
+    \RightLabel{$\lor I_1$}
+    \UnaryInfC{$\Gamma \vdash A \lor B$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash B$}
+    \RightLabel{$\lor I_2$}
+    \UnaryInfC{$\Gamma \vdash A \lor B$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A \lor B$}
+    \AxiomC{$\Gamma, x: A \vdash C$}
+    \AxiomC{$\Gamma, y: B \vdash C$}
+    \LeftLabel{$x, y$}
+    \RightLabel{$\lor E$}
+    \TrinaryInfC{$\Gamma \vdash C$}
+\end{prooftree}
+
+If you know something is true, you can OR it with anything, even something false, and it'll still be true: ``$2 + 2 = 4$ or the moon is made of cheese'' is true. Note that this is the inclusive or, not exclusive or. In logic, the last inference rule is sometimes called ``case analysis,'' which should help reinforce its correspondence with the case construct from STLC \cite{farooqui}.
+
+Take a moment to consider how products/conjunctions and sums/disjunctions are dual to each other. Products/conjunctions have 1 introduction rule and 2 elimination rules; sums/disjunctions have 2 introduction rules and 1 elimination rule. Products/conjunctions take 2 terms and combine them into 1; sums/disjunctions take 1 term and allow them to have 2 forms (the 2 constructors, or being on the left or right of $\lor$).
+
+Something to note about the precedence of the connectives we've introduced so far: in both STLC and NJ, $\times/\land$ has the highest precedence, followed by $+/\lor$, then $\to$/$\implies$. So if you see a type like $A + B \times C \to D$, that is $(A + (B \times C)) \to D$, and $A \lor B \land C \implies D$ is $(A \lor (B \land C)) \implies D$.
+
+Like product types and conjunctions, these 2 forms are also commutative ($A + B = B + A$ and $A \lor B \iff B \lor A$), associative ($(A + B) + C = A + (B + C)$ and $(A \lor B) \lor C \iff A \lor (B \lor C)$), and have identity elements ($0/\bot$). Sums and disjunctions are also distributive with products and conjunctions: $A \times (B + C) = A \times B + A \times C$ and $A \land (B \lor C) \iff A \land B \lor A \land C$, and they have an interaction with functions and implication: $A + B \to C = (A \to C) \times (B \to C)$ and $A \lor B \implies C \iff (A \implies C) \land (B \implies C)$. If you have a function from a sum to something, you can split it up into 2 functions, each of which handles 1 case; if you know either of 2 things imply something else, then both those things each imply it separately.
+
+\section{Negation and classical logic}
+
+Speaking from the logical side, after starting with implication, true, and false, then adding conjunction and disjunction, it seems like the next logical step would be to add negation, right? Firstly, since we have implication and false, we can already express negation as $\neg A \iff (A \implies \bot)$. In STLC, a function to 0 only exists if the argument type is equivalent to 0, like $A \times 0$, making them not very useful. Secondly, since STLC corresponds to intuitionistic logic, which lacks the law of the excluded middle and double negation elimination, there are no possible terms of type $A + (A \to 0)$ or $((A \to 0) \to 0) \to A$ for any $A$ not equivalent to the 0 type. Since these involve functions to 0, which I just said aren't very useful, it might seem like we're not missing out on much by not having them, but it turns out that the double negation type in particular can be given a quite practical interpretation.
+
+By adding a new form for double negation elimination, we will extend STLC to something a bit more powerful than just the $\lambda$-calculus. This is the simply-typed $\lambda_\Delta$-calculus, which adds a new form for terms: $\Delta x. M$ where $M$ is another term, and no new types or forms for them on top of what STLC already has. The new typing rule that this form introduces is:
+
+\begin{prooftree}
+    \AxiomC{$\Gamma, x: A \to 0 \vdash M: 0$}
+    \RightLabel{$\neg \neg E$}
+    \UnaryInfC{$\Gamma \vdash \Delta x^{A \to 0}.M: A$}
+\end{prooftree}
+
+This new $\Delta$ abstraction is like a $\lambda$ abstraction, but in reverse. Where a $\lambda$ uses a term of type $A$ to create a function which takes an $A$, a $\Delta$ uses a function which takes an $A$ to create an $A$.
+
+The creation of a lambda abstraction followed immediately by its application can be simplified by the relation of $\beta$-reduction. Similarly, delta abstractions can also be simplified by the relation of $\Delta$-reduction: \\
+\\
+$(\Delta x^{(A \to B) \to 0}.M)N \to_\Delta \Delta z^{B \to 0}.M[\lambda y^{A \to B}.z(y N)/x] \\
+\Delta x^{A \to 0}.x M \to_\Delta M \text{ if } x \not\in FV(M) \\
+\Delta x^{A \to 0}.x(\Delta y^{A \to 0}.M) \to_\Delta \Delta z^{A \to 0}.M[z/x][z/y] \\$
+
+This is significantly more complex than $\beta$-reduction, which only had 1 case. The 1st case is equivalent to $\beta$-reduction, as it deals with abstractions that are immediately applied. However, it doesn't simply ``unabstract'' the abstraction and yield its body, but rather it creates another abstraction. Also, it may seem like that term is typed incorrectly, as it looks like the delta expects an $(A \to B) \to 0$ but is being provided $N: A$, but remember that the result of that delta is a term of type $A \to B$, which is correctly being provided an $A$. What exactly that function to 0 is will be explained soon.
+
+The 2nd case is another way to undo an abstraction, but it doesn't require an application. I think it is this case that most strongly hints towards what a delta abstraction actually is: here, we create a delta that involves passing $M: A$ to some function $x: A \to 0$, but the result is just $M$, which ``escapes'' from the delta. % this case is like eta reduction, if we want to explain that
+
+The 3rd case is a way to simplify nested delta abstractions by composing them. It is very similar to the 2nd case, with a delta that just applies the function given to it to something as its body.
+
+Like $\beta$-reduction, $\Delta$-reduction is also strongly normalizing: every term, after repeatedly being $\Delta$-reduced, eventually enters into a form which $\Delta$-reduction doesn't apply to. However, this relation does not have the Church-Rosser property: there are terms that can have the same reductions applied, but in a different order, and lead to different normal forms.
+
+So, what actually is a delta abstraction from a computational standpoint? It is known as a control operator, which in a programming language is a construct that allows you to change the control flow of your program \cite{sorensen}. In most programming languages, the only user-accessible ones are exception handlers. They make it so that when an error occurs somewhere in your code, instead of the program stopping execution entirely and crashing, its flow is redirected and it will instead start executing the code you provide to handle the error. The Scheme language has user-definable control operators, which allow you to simulate things like coroutines (functions that can ``pause'' their own execution and return to it later) and backtracking (code that can execute multiple times, going down different paths each time), which in most other languages can't be done unless support for them is built into the language itself.
+
+The specific control operator that $\Delta$ corresponds to is called $\mathcal{C}$ \cite{griffin}. $\mathcal{C}$ takes a term of type $(A \to 0) \to 0$ and evaluates to one of type $A$. This is slightly different from $\Delta$, but it's trivial to turn one into the other: $\mathcal{C}(\lambda x^{A \to 0}.M) = \Delta x^{A \to 0}.M$. What $\mathcal{C}$ does is essentially provide an ``escape hatch'' to the function given to it. If at any point during the evaluation of $M$, $x$ is applied to anything, whatever its argument is will become the final value of the entire expression involving $\mathcal{C}$. For example, the result of $\mathcal{C}(\lambda x^{1 \to 0}. \text{inj}_2 \langle x *, \lambda y^1. y \rangle)$ is just $*$. The product involving it is never constructed, and the result of that is never put into a sum. When $x$ is applied, evaluation stops there and the result is whatever it is given. In programming, the parameter of $\Delta$ or the function provided to $\mathcal{C}$ is usually called k, which stands for ``continuation.'' That is what functions of type $A \to 0$ are called, and they represent ``the rest of the program.'' Whenever a term is being evaluated, its continuation is a function whose body is the entire program, but the term itself is replaced by the parameter to that function. In Scheme, $\mathcal{C}$ is called \texttt{call/cc}, or ``call with current continuation.''
+
+On the logical side, we obviously can't use NJ and must instead switch to NK, classical natural deduction. It is identical to NJ, except now double negation elimination has an inference rule:
+
+\begin{prooftree}
+    \AxiomC{$\Gamma, x: \neg A \vdash \bot$}
+    \LeftLabel{$x$}
+    \RightLabel{$\neg \neg E$}
+    \UnaryInfC{$\Gamma \vdash A$}
+\end{prooftree}
+
+For convenience, we will use the usual negation symbol here. We don't need an inference rule for law of the excluded middle because double negation elimination on its own suffices to turn intuitionistic logic into classical logic. If we have it, we can actually prove the law of the excluded middle.
+
+The reverse is also true: law of the excluded middle lets you prove double negation elimination. There's even another axiom we could adopt, Peirce's law ($\forall A. \forall B. ((A \implies B) \implies A) \implies A$), which would let us prove, and could be proven by, the other 2. Of these 3, only 1 is needed for classical logic.
+
+% \begin{prooftree}
+%     \AxiomC{}
+%     \RightLabel{$Ax$}
+%     \UnaryInfC{$\Gamma, x: \neg (A \lor \neg A) \vdash \neg (A \lor \neg A)$}
+    
+%     \AxiomC{}
+%     \RightLabel{$Ax$}
+%     \UnaryInfC{$\Gamma, x: \neg (A \lor \neg A) \vdash \neg (A \lor \neg A)$}
+    
+%     \AxiomC{}
+%     \RightLabel{$Ax$}
+%     \UnaryInfC{$\Gamma, y: A \vdash A$}
+%     \RightLabel{$\lor I_1$}
+%     \UnaryInfC{$\Gamma, y: A \vdash A \lor \neg A$}
+
+%     \RightLabel{$\implies E$}
+%     \BinaryInfC{$\Gamma, x: \neg (A \lor \neg A), y: A \vdash \bot$}
+%     \LeftLabel{$y$}
+%     \RightLabel{$\implies I_s$}
+%     \UnaryInfC{$\Gamma, x: \neg (A \lor \neg A) \vdash \neg A$}
+%     \RightLabel{$\lor I_2$}
+%     \UnaryInfC{$\Gamma, x: \neg (A \lor \neg A) \vdash A \lor \neg A$}
+
+%     \RightLabel{$\implies E$}
+%     \BinaryInfC{$\Gamma, x: \neg (A \lor \neg A) \vdash \bot$}
+    
+%     \LeftLabel{$x$}
+%     \RightLabel{$\neg \neg E$}
+%     \UnaryInfC{$\Gamma \vdash A \lor \neg A$}
+% \end{prooftree}
+
+I said about the $\lambda_\Delta$-calculus that it is strongly normalizing, but it is no longer Church-Rosser due to double negation elimination. That is true of NK as well: while there are no infinitely reducing proofs, it is not confluent anymore. It's possible to eliminate the detours in 1 proof in 2 different orders, and end up with 2 different proofs that have contradictory conclusions, analogously to how reducing a $\lambda_\Delta$-calculus term in 2 different orders could lead to 2 different results.
+
+\section{Polymorphism and universal quantification}
+
+At this point, we have added all the useful connectives to STLC and NJ. From here, we will leave these 2 systems behind and move to something more powerful: System F and second-order natural deduction.
+
+System F is an extension of STLC which adds polymorphism, or the ability for functions to be made ``generic'' with regards to the type of their argument. More broadly, it allows the values of terms to depend on types. This is provided by adding a new syntactic form for terms: $\Lambda \alpha. M$ where $M$ is a term. This $\Lambda$ abstraction creates a function which, rather than taking a term as an argument, takes a type as an argument. We could have a function like $\Lambda \alpha. \lambda x^\alpha. x$ which first takes a type, then a term of that type, and then returns that same term. This is quite significant: what we've just made is an identity function that doesn't care about its argument's type. In STLC, this is impossible, and you'd have to make a different function like this for each type: $\lambda x^1.x$, $\lambda x^{1 \times 1}.x$, $\lambda x^{1+1}.x$, etc. However, now one could ask, what is the type of this function? To answer that, we need a new form for types: $\forall \alpha. A$ where $A$ is a type. $\Lambda$ functions create types in this form: $\Lambda \alpha. \lambda x^\alpha. \alpha: \forall \alpha. \alpha \to \alpha$. $\forall$ is called the ``universal quantifier.''
+
+The variable bound by $\forall$ is called a type variable. Like with normal variables, there is a notion of free type variables, those which are not bound by any $\Lambda$: \\
+\\
+$FTV(\alpha) = \{\alpha\} \\
+FTV(A \to B) = FTV(A \times B) = FTV(A + B) = FTV(A) \cup FTV(B) \\
+FTV(\forall \alpha. A) = FTV(A) - \{\alpha\} \\$
+
+We will denote substitution of type variables the same way as term variables: $A[B/\alpha]$ means replacing all the free instances of $\alpha$ with $B$ in $A$.
+
+Since we now have another ``level'' of functions, functions which take types instead of terms, we have to define a new rule for System F's $\beta$-reduction. For terms, it works the same way as in STLC: $(\lambda x^A.M)N \to_\beta M[N/x]$. For types, it's basically the same thing: $(\Lambda \alpha.A)B \to_\beta A[B/\alpha]$.
+
+Like STLC and ULC, System F also has a notion of a $\beta$-normal form, which is the form a term without any potential $\beta$-reductions ($(\lambda x^A.M)N$ or $(\Lambda \alpha.A)B$) takes. However, terms can be more complex in System F due to $\Lambda$, so its definition is also more complex: a System F term is in $\beta$-normal form if it is in the form $\Lambda a_1. \Lambda a_2... \Lambda a_n. zQ_1Q_2...Q_m$. Here, $\Lambda$ can actually be either $\Lambda$ or $\lambda$. $z$ is a term, which must be in normal form. Each $Q$ is either a term or a type, and if it's a term, it must also be in normal form. System F also preserves the Church-Rosser property, which says that every term has a unique $\beta$-normal form if it has one, and strong normalization, which says that every term has a $\beta$-normal form, which when combined means that every term has exactly 1 unique $\beta$-normal form \cite{selinger}.
+
+In terms of typing rules, System F adds 2:
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: A$}
+    \AxiomC{$\alpha \not\in FTV(\Gamma)$}
+    \RightLabel{$\forall I$}
+    \BinaryInfC{$\Gamma \vdash \Lambda \alpha. M: \forall \alpha. A$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash \Lambda \alpha. M: \forall \alpha. A$}
+    \RightLabel{$\forall E$}
+    \UnaryInfC{$\Gamma \vdash M: A[B/\alpha]$}
+\end{prooftree}
+
+$\forall$ introduction simply says that if you have a term whose type depends on some arbitrary $\alpha$, you can universally quantify it. If we have a term like $\lambda x^\alpha.x$, which can exist for any arbitrary, but specific, $\alpha$, then it can exist for any general $\alpha$ as $\Lambda \alpha. \lambda x^\alpha. x$.
+
+$\forall$ elimination is what allows us to instantiate generic, universal terms. If we have a function $\Lambda \alpha. \lambda x^\alpha. \langle x, x \rangle$, we can substitute in another type $B$ and get rid of the quantifier, which gives $\lambda x^B. \langle x, x \rangle$. If a function like that can exist for any type, it can exist for any specific type we choose.
+
+The proof system corresponding to System F is second-order intuitionistic natural deduction, which adds universal quantification over propositions. Here are the inference rules it adds:
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A$}
+    \AxiomC{$\alpha \not\in FV(\Gamma)$}
+    \RightLabel{$\forall I$}
+    \BinaryInfC{$\Gamma \vdash \forall \alpha. A$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash \forall \alpha.A$}
+    \RightLabel{$\forall E$}
+    \UnaryInfC{$\Gamma \vdash A[B/\alpha]$}
+\end{prooftree}
+
+$\forall$ introduction says that if we can prove a proposition that depends on some arbitrary $\alpha$, then we know it's true for any general $\alpha$. Mathematical proofs of propositions involving $\forall$ tend to start with giving something an arbitrary value: anyone familiar with real analysis knows that proving a limit by the $\epsilon$-$\delta$ definition starts by going ``Let $\epsilon > 0$...'' $\forall$ elimination lets us go the opposite direction: if we know something is true for any general $\alpha$, then it's true for any specific $\alpha$ that we choose.
+
+Like System F, NJ with universal quantification is still strongly normalizing and confluent. With System F adding a new $\beta$-reduction rule, that also means this system has a new type of detour that can be eliminated:
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A$}
+    \AxiomC{$\alpha \not\in FV(\Gamma)$}
+    \RightLabel{$\forall I$}
+    \BinaryInfC{$\Gamma \vdash \forall \alpha. A$}
+    \RightLabel{$\forall E$}
+    \UnaryInfC{$\Gamma \vdash A[B/\alpha]$}
+\end{prooftree}
+
+This quite pointlessly proves that $A$ is true, given that we can prove $A$ is true.
+
+An interesting thing about $\forall$ is that just it and $\to$/$\implies$ suffice to simulate all the other connectives introduced so far (except $\Delta$, because we're in intuitionistic logic). $A \times B$ can be expressed as $\forall \alpha. (A \to B \to \alpha) \to \alpha$ and $\langle M, N \rangle = \Lambda \alpha. \lambda z^{A \to B \to \alpha}.z M N$. In this encoding, a product is a function which takes another function and applies it to the 2 components of the product which are ``stored'' inside the function body. The projection functions are definable too: $\pi_1 = \Lambda \alpha. \Lambda \beta. \lambda M^{\forall \gamma. (\alpha \to \beta \to \gamma) \to \gamma}.M \alpha (\lambda x^\alpha. \lambda y^\beta. x)$ and $\pi_2 = \Lambda \alpha. \Lambda \beta. \lambda M^{\forall \gamma. (\alpha \to \beta \to \gamma) \to \gamma}.M \beta (\lambda x^\alpha. \lambda y^\beta. y)$. These functions take a pair $M: \forall \gamma. (\alpha \to \beta \to \gamma) \to \gamma$, instantiate the quantified type with the desired output type (the type of either the 1st or 2nd component of the pair), and then pass a function which takes the 2 components and returns the desired one, completely ignoring the other. Similarly, on the logical side, $A \land B$ can be expressed as $\forall \alpha. (A \implies B \implies \alpha) \implies \alpha$.
+
+$A + B = \forall \alpha. (A \to \alpha) \to (B \to \alpha) \to \alpha$ and $A \lor B \iff \forall \alpha. (A \implies \alpha) \implies (B \implies \alpha) \to \alpha$. A sum takes 2 functions, each of which can be applied to 1 of the components, applies whichever one corresponds to its constructor, and returns the result: $\text{inj}_1 M = \Lambda \alpha. \lambda u^{A \to \alpha}. \lambda v^{B \to \alpha}. uM$ and $\text{inj}_2 M = \Lambda \alpha. \lambda u^{A \to \alpha}. \lambda v^{B \to \alpha}. vM$. $\text{case }L\text{ of }(x)M; (y)N: C$ becomes $L C (\lambda x^A. M)(\lambda y^B. N)$: the sum $L$ chooses whether to evaluate the function that returns $M$ or $N$ based on its constructor, just like the case construct normally does.
+
+% What is the logical meaning of these equivalencies? and = for all propositions alpha, if (a implies b implies alpha) implies alpha then a and b are true... huh?
+
+Even the 0 and 1 types can be defined in this way. $0 = \forall \alpha. \alpha$: having a universally quantified type, it would have to take the form $\Lambda \alpha. M$. What could we possibly put in $M$'s place? There is no single term that exists for all types. Logically, this type is equivalent to saying ``all propositions are true,'' which obviously isn't true, so this is also how $\bot$ is expressed. $1 = \forall \alpha. \alpha \to \alpha$ has exactly 1 term, which exists for all types, even uninhabited ones: $\Lambda \alpha. \lambda x^\alpha.x$, the identity function. All propositions imply themselves, even false ones, so this is how $\top$ is expressed \cite{sorensen}.
+
+This style of constructing types is actually quite interesting. We are defining new types based not on their possible forms (``a product looks like $\langle M, N \rangle$ and a sum looks like either $\text{inj}_1 M$ or $\text{inj}_2N $''), but on what can be done to them. A product is something which can have a function applied to its 2 components, and a sum is something which can be given 2 functions and decide which one should be applied to its contents based on its constructor. The encodings created for these types are called Church encodings, and they were originally invented in the context of untyped lambda calculus. They work in System F too with some modification, and in this context they are usually called B\"{o}hm-Berarducci encodings. Other data types definable in this way include booleans and natural numbers. A boolean is something which takes 2 options and returns 1 of them without doing anything to it: true = $\Lambda \alpha. \lambda x^\alpha. \lambda y^\alpha. x$ and false = $\Lambda \alpha. \lambda x^\alpha. \lambda y^\alpha. y$. We can use these to define an if-then-else conditional structure as $\Lambda \alpha. \lambda b^{\forall \beta. \beta \to \beta \to \beta}. \lambda p^\alpha. \lambda q^\alpha. b\alpha pq$. A natural number $n$ is something which takes a function and an argument, and repeatedly applies the function to that argument $n$ times: $0 = \Lambda \alpha.\lambda s^{\alpha \to \alpha}. \lambda z^\alpha. z$, $1 = \Lambda \alpha. \lambda s^{\alpha \to \alpha}. \lambda z^\alpha. sz$, $2 = \Lambda \alpha. \lambda s^{\alpha \to \alpha}. \lambda z^\alpha. s(sz)$, etc.
+
+Considering Church encodings use nothing but polymorphism and functions and none of the other type connectives, it's easy to think that they're useless in practical computer science. The broader idea of Church encodings though, defining data types based on what can be done to them/how they're used rather than what form they take/how they're built, is actually the exact principle underlying object-oriented programming. Those familiar with object-oriented programming should recognize this idea in interfaces, which specify a type based on the methods it defines (what you can do with it) rather than the class used to construct it (the form it takes). Even though functional and object-oriented programming styles are typically viewed as being incompatible with each other, the lambda calculus is actually able to express both of them thanks to these encodings \cite{downen}.
+
+\section{Abstract data types and existential quantification}
+
+After universal quantification, the next logical step is of course existential quantification. To System F we will add a new form for types, $\exists \alpha. A$ where $A$ is a type, as well as 2 rather syntactically complex forms for terms. The 2 new rules dictating their behavior are:
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: A[B/\alpha]$}
+    \RightLabel{$\exists I$}
+    \UnaryInfC{$\Gamma \vdash \text{pack } M, B \text{ to } \exists \alpha. A: \exists \alpha. A$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash M: \exists \alpha. A$}
+    \AxiomC{$\Gamma, x: A \vdash N: B$}
+    \AxiomC{$\alpha \not\in FTV(\Gamma) \cup FTV(B)$}
+    \RightLabel{$\exists E$}
+    \TrinaryInfC{$\Gamma \vdash \text{abstype } \alpha \text{ with } x: A \text{ is } M \text{ in } N: B$}
+\end{prooftree}
+
+With $\exists$ being a binding form, there is also a new rule for determining free type variables: $FTV(\exists \alpha. A) = FV(A) - \{\alpha\}$, just like universal quantification. Since it has exactly 1 introduction and elimination form, we can also add a new $\beta$-reduction rule: $\text{abstype } \alpha \text{ with } x: A \text{ is (pack } M, B \text{ to } \exists \alpha. A \text{) in } N \to_\beta N[B/\alpha][M/x]$ \cite{sorensen}.
+
+Existential quantification corresponds with the programming concept of abstract data types (ADTs), which are types that are defined only insofar as they follow some ``interface,'' or set of operations that is defined for them \cite{mitchell}. A prototypical example is a stack: you can push (add an element to the top), pop (remove the top element), or peek (observe the top element but not remove it). We could express a stack of integers as an existential type like this: $\exists \alpha. (\alpha \times \text{int} \to \alpha) \times (\alpha \to \alpha) \times (\alpha \to \text{int})$, or maybe a bit more clearly, using some syntactic sugar, as $\exists \alpha. \{\text{push}: \alpha \times \text{int} \to \alpha, \text{pop}: \alpha \to \alpha, \text{peek}: \alpha \to \text{int}\}$. Whatever $\alpha$ is, we don't care exactly what form it takes as long as there exist 3 functions with types $\alpha \times \text{int} \to \alpha$, $\alpha \to \alpha$, and $\alpha \to \text{int}$. Also note that even though we can give these functions names which provide an expectation of what the function in question would do, the only invariant we can actually enforce is that it has the specified type. If we want to implement a stack of integers using an integer ($\alpha = \text{int}$), an entirely valid way to do that would be: pack $\{\text{push}: \lambda x^{\text{int} \times \text{int}}. \pi_1(x) + \pi_2(x), \text{pop}: \lambda x^{\text{int}}. -x, \text{peek}: \lambda x^{\text{int}}. x^5 - x - 1\}, \text{int}$ to $\exists \alpha. \{\text{push}: \alpha \times \text{int} \to \alpha, \text{pop}: \alpha \to \alpha, \text{peek}: \alpha \to \text{int}\}$. This is obviously a completely nonsensical implementation of a stack, but everything's type matches what it's supposed to be, so technically it is a stack.
+
+Existential types are usually not present in most programming languages in the same way universal types are, despite their practical usefulness. Even when explicit existential types are present, their values are usually relegated to being ``second-class'' values such as modules, which are collections of variable definitions, functions, and types that those definitions may depend on. They are ``second-class'' in the sense that they cannot be used in all the ways that a ``first-class'' value like, say, an integer could. In pretty much any programming language, you can define a function that takes/returns an integer or store one in a variable, but languages that let you pass modules into functions or variables are extremely uncommon.
+
+Now we'll add 2 corresponding rules to natural deduction:
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A[B/\alpha]$}
+    \RightLabel{$\exists I$}
+    \UnaryInfC{$\Gamma \vdash \exists \alpha. A$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash \exists \alpha. A$}
+    \AxiomC{$\Gamma, x: A \vdash B$}
+    \AxiomC{$\alpha \not\in FV(\Gamma) \cup FV(B)$}
+    \LeftLabel{$x$}
+    \RightLabel{$\exists E$}
+    \TrinaryInfC{$\Gamma \vdash B$}
+\end{prooftree}
+
+$\exists$ introduction says that if we can prove some proposition $A$, which depends on $B$, then we can generalize and say that there exists some proposition which can be substituted into $A$ and have it be true. $\exists$ elimination says that if we assume there's something that satisfies $A$, and its existence would imply $B$, then we can infer $B$, but only so long as $B$ doesn't depend on the identity of the specific thing satisfying $A$. We can't say anything more about it other than it exists, and only because we assumed so.
+
+$\exists$ also introduces a new kind of detour that can be eliminated, corresponding to the new $\beta$-reduction rule. Like the other instances of detours, it occurs when an introduction is immediately followed by an elimination.
+
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash A[B/\alpha]$}
+    \RightLabel{$\exists I$}
+    \UnaryInfC{$\Gamma \vdash \exists \alpha. A$}
+    \AxiomC{$\Gamma, x: A \vdash B$}
+    \AxiomC{$\alpha \not\in FV(\Gamma) \cup FV(B)$}
+    \LeftLabel{$x$}
+    \RightLabel{$\exists E$}
+    \TrinaryInfC{$\Gamma \vdash B$}
+\end{prooftree}
+
+This proof makes an assumption $x$ that $A$ is true, when we already know it to be true without the assumption (from the premise of $\exists I$). Thus, all this really proves is $B$ given $B$.
+
+\section{Theorem proving}
+
+The whole point of the Curry-Howard correspondence is that propositions are equivalent to types. On a higher level, we can use propositions and inference rules to create a proof. Correspondingly, we can use types and typing rules to create a term, which we could also call a program. These ``programs'' certainly aren't programs in the way a programmer would think of them: they'd say programs are instructions stored in a computer's memory that are executed by a CPU, while lambda calculus programs are really just strings defined by some grammar. However, people have created programming languages that use lambda calculus as a basis, allowing you to write and execute computer programs that are equivalent to lambda calculus ones. One of these languages is called OCaml, and it is what I will be using in this section.
+
+OCaml is based on lambda calculus in the sense that its terms and types are equivalent to the ones in lambda calculus, specifically a variant of System F called the Hindley-Milner type system \cite{pierce}. Like the lambda calculus, it has anonymous functions that take exactly 1 argument, which are called lambdas, and types for these functions. It has products (called ``tuples''), sums (``variants''), and polymorphic types. It even has equivalents to things like the product projection functions $\pi_1$ and $\pi_2$ (\texttt{fst} and \texttt{snd}) and the ``case x of ...'' structure for decomposing sums (\texttt{match x with ...}). Some changes are made for practicality purposes, like adding named variables, which don't exist in lambda calculus outside of function parameters, and the ability for products and sums to have more than 2 components or constructors. There's also an entire subsystem dedicated to object-oriented programming, which gives OCaml the ``O'' in its name.
+
+% OCaml, and other languages of the ML family such as Standard ML, F\#, and Haskell, are well-known for their strong, static type systems. Static typing means that type errors are caught when the program is being compiled, before it is run, as opposed to dynamic typing, where type errors are only caught at run time. In this way, the compiler is able to detect and report errors caused by common programmer mistakes like providing the wrong type or number of arguments to a function, assigning a value to a variable of a different type, etc. When using an integrated development environment that supports the language you're coding in, these errors can even be reported without you having to compile your code at all. In Visual Studio Code, an OCaml extension will underline instances of type errors and explain what type the expression in question was expecting versus what you gave it. In a dynamically-typed language like Python or JavaScript however, you're mostly on your own when it comes to type errors. If you accidentally do something like add a number and a string together, you won't find out about this until the code runs, gets to that point, and crashes. Or, even worse, you might get a valid, but unintended, result which allows the program to keep running for a while before it causes an error even further down the line. In OCaml meanwhile, you'd have the error reported to you as soon as you're done typing the line responsible for generating it.
+
+The fact that System F serves as a theoretical basis of OCaml is what gives this language the ability to write programs that double as proofs. When you write an OCaml program, you are essentially writing a System F term that your computer can evaluate, as opposed to any other System F term which is just an abstract mathematical object. Despite the strength of OCaml's type system though, it is not exactly meant for theorem proving. Its type system lacks the power to encode things in logic like predicates. There exists a structure called the lambda cube, which shows 3 independent features which can be added to a type system to give it more power. There are $2^3 = 8$ different possible lambda calculi with type systems of varying, but to some extent comparable, expressive power. The least powerful of them all is STLC, which contains none of the features represented by the 3 axes. In STLC, all we can say about the relationship between terms and types is that terms can depend on other terms via functions, products, and sums. A function is a term, and its body is itself a term; a product is composed of 2 terms; a sum contains 1 term and a tag. 1 feature that can be added to STLC for more power is polymorphism, which could be explained as the ability for terms to depend on types. We can create a polymorphic function like $\Lambda \alpha. \lambda x^\alpha. x: \forall \alpha. \alpha \to \alpha$ whose value depends on what we choose to instantiate the quantified type $\alpha$ with. Adding polymorphism to STLC gives System F. The 2nd feature that can be added are type constructors, which allow types to depend on other types. Technically, the connectives present in STLC are predefined type constructors: $\to$ itself is not a type, and you must put a type on both sides of the arrow to create an actual type. A lambda calculus with type constructors allows you to create your own connectives by adding type-level lambdas, which take a type and return a type. The final feature is dependent types, which is the ability for types to depend on terms \cite{sorensen}.
+
+Of these 3 features, OCaml has polymorphism and type constructors (which we won't use at all to limit its type system to System F's power), but lacks dependent types. Dependent types are really what separate general-purpose languages like OCaml from actual theorem provers like Lean or Rocq. Dependent types give you the ability to express arbitrary predicates and prove the theorems of (first-order) predicate logic, which is much more powerful and expressive than even the second-order propositional logic that System F is equivalent to. Using dependent types, you can create a type based on 2 integers which has a term that exists iff those 2 integers are equal: in other words, a proof of equality between numbers. System F doesn't let you do that because you can't involve terms in types, or encode the predicate of mathematical equality. So, while it seems like we can't prove anything truly interesting in OCaml, we can still do some sort of mathematical theorem proving.
+
+Throughout our exploration of the various connectives, we have noted 14 identities that they follow:
+
+\begin{multicols}{2}
+    \begin{enumerate}
+        \item $0 + x = x$
+        \item $x + y = y + x$
+        \item $(x + y) + z = x + (y + z)$
+        \item $x \times 0 = 0$
+        \item $x \times 1 = x$
+        \item $x \times y = y \times x$
+        \item $(x \times y) \times z = x \times (y \times z)$
+        \item $x \times (y + z) = x \times y + x \times z$
+        \item $0 \to x = 1$
+        \item $x \to 1 = 1$
+        \item $1 \to x = x$
+        \item $x + y \to z = (x \to z) \times (y \to z)$
+        \item $x \to y \times z = (x \to y) \times (x \to z)$
+        \item $x \to y \to z = x \times y \to z$
+    \end{enumerate}
+\end{multicols}
+
+If we think of these identities in an arithmetic sense, with functions as exponents, products as multiplication, and sums as addition, we can see that they also hold for positive integers as well. Can we use them to prove a non-trivial mathematical theorem?
+
+% talk about zippers somewhere?
+
+Let's think of a mathematical identity like the expansion of a binomial: $(x + y)^2 = x^2 + 2xy + y^2$. Translating this into the language of types is mostly simple, until we get to the 2 and the equals sign. The 14 identities don't say anything about the existence of the number 2, only 0 and 1. However, $2 = 1 + 1$, and so we could say that the ``2'' type is the sum of a unit and another unit, distinguished only by the constructor. The canonical ``2'' type is the boolean type: booleans are either true or false, and they carry no more info than that.
+
+What does it mean for 2 types to be equal? In logic, we say 2 propositions $A$ and $B$ are equal if $A \iff B$, which is equivalent to $(A \implies B) \land (B \implies A)$. By analogy, we can say 2 types $A$ and $B$ are equal if there exists a value of type $(A \to B) \times (B \to A)$, in other words if a bijection between these 2 types exists. So, to prove $(x + y)^2 = x^2 + 2x + y^2$ in a typed setting, we have to create a value of type $((2 \to x + y) \to ((2 \to x) + (2 \times x \times y) + (2 \to y))) \times (((2 \to x) + (2 \times x \times y) + (2 \to y)) \to (2 \to x + y))$. We will actually only create one half of this product and thus only prove 1 direction of the identity, because the function corresponding to the other direction is mostly the same thing but backwards. The OCaml program that creates this value is located in the appendix.
+
+Up until line 47 of the program, we're just setting up the proofs of the identities. I did not include proofs of every identity, only the ones relevant in this proof. They are enough to allow you to compile this program, if you'd like to verify that this proof is correct. Each identity's proof consists of 2 functions, one named after the identity's numerical index, and another named the same way but followed by an apostrophe. The apostrophe denotes which direction of the proof the function handles: \texttt{three} handles the $(x + y) + z \to x + (y + z)$ direction of identity 3, while \texttt{three'} handles the other direction, $x + (y + z) \to (x + y) + z$. Definitions of both variables and functions in OCaml start with the \texttt{let} keyword, followed by the name of the function, then the variable's type, an equals sign, and then the variable's value. The type is usually optional as most of the time, the compiler can use type inference to figure out its type automatically. I decided to write the type annotations here though for documentation purposes.
+
+The syntax of OCaml's types should hopefully be mostly familiar: \texttt{x -> y} denotes $x \to y$ and \texttt{x * y} denotes $x \times y$. Types whose names begin with apostrophes like \texttt{'x}, \texttt{'y}, \texttt{'z}, etc. are universally quantified: \texttt{'x -> 'y -> unit} = $\forall x. \forall y. x \to y \to 1$. \texttt{(x, y) Either.t} denotes $x + y$, and the reason this is so complicated is because OCaml doesn't have a ``canonical'' sum type constructor. Unlike in the lambda calculus, where sum types have exactly 2 constructors $\text{inj}_1$ and $\text{inj}_2$, sum types in OCaml can have any amount, including 0, and they are referenced by user-provided names rather than numbers. In addition, you can have 2 sum type constructors that have the same ``shape,'' yet are considered different types: \texttt{type sum1 = A of int | B of bool} and \texttt{type sum2 = C of int | D of bool}, despite both being equivalent to int + bool in lambda calculus, are different types according to OCaml. \texttt{(x, y) Either.t} is the closest you can get to the canonical sum type constructor: it has 2 constructors called \texttt{Left}, which holds a value of type \texttt{x}, and \texttt{Right}, which holds a value of type \texttt{y}.
+
+\texttt{fun x -> M} is a lambda: an anonymous function that takes exactly 1 argument. It is exactly the same as $\lambda x. M$. In typed lambda calculus as we presented it, function parameters have a type annotation, like $\lambda x^A. M$. You can represent this in OCaml as \texttt{fun (x: A) -> M}, but the OCaml compiler has type inference, so for the most part this isn't necessary. \texttt{match x with Left y -> M | Right z -> N} is equivalent to $\text{case } x \text{ of } (y)M; (z) N$ but extended to support the fact that sum types can have more than 2 constructors and can no longer be referenced purely by index. \texttt{fst} and \texttt{snd} are equivalent to $\pi_1$ and $\pi_2$ for extracting values out of products, and products are constructed between parentheses: \texttt{(x, y)} is equivalent to $\langle x, y \rangle$. \texttt{unit} denotes the 1 type and its sole value is \texttt{()}.
+
+Line 47 is where the proof of the binomial expansion actually starts. The entire thing is a function, taking an argument of type \texttt{bool -> ('x, 'y) Either.t} ($= \forall x. \forall y. 2 \to x + y$) and applying various transformations to it, 1 step at a time until eventually returning a value of type \texttt{(bool -> 'x, (bool * ('x * 'y), bool -> 'y) Either.t) Either.t} ($= \forall x. \forall y. (2 \to x) + 2 \times x \times y + (2 \to y)$). The transformations that it is put through are precisely the functions which prove the identities.
+
+On the first few lines of the proof you'll see that they start with \texttt{let stepn = ...}. \texttt{let} defines not just global variables and functions, but local variables too. These step variables only exist within the scope of the \texttt{binomial\_expansion} function, and their names cannot be accessed outside of it. I try to create a new step variable for each identity that is applied, but towards the end of the proof things start to get hairy and the organization of the code becomes a lot more complicated.
+
+We start on line 48 by applying the identity that $1 + 1 = 2$ to the function's argument, the proof of which we had to define ourselves on line 38. Note that applying the identity here is not just as simple as \texttt{one\_plus\_one\_is\_two m} because for that to be valid, \texttt{m}'s type would have to be \texttt{(unit, unit) Either.t}. It's not: it's a function which takes an argument of that type and then returns something else. So we essentially have to create a new function that takes a \texttt{bool}, turns it into a \texttt{(unit, unit) Either.t}, and then passes that through the provided function. That new function's type is \texttt{(unit, unit) Either.t -> ('x, 'y) Either.t}. Mathematically, we've proven $(x + y)^2 = (x+y)^{1+1}$.
+
+Line 49 takes the output of the previous line and applies identity 12 to it, turning $(x+y)^{1+1}$ into $(x+y)^1 \times (x + y)^1$. This time applying the identity is simple because the input has the exact type that \texttt{twelve} wants. From here, we want to get rid of the unnecessary 1 in the exponent, so we apply identity 11. However, what we have at this point is a product, so we'll need to apply \texttt{eleven} to both parts of it to get $(x + y) \times (x + y)$. We can then use identity 8 to distribute and get $(x + y) \times x + (x + y) \times y$. We want to distribute again, but this time it's from the right rather than the left. Identity 8 only defines left distribution, but we can use the commutativity of multiplication from identity 6 to switch both parts around and distribute, yielding $(x \times x + x \times y) + (y \times x + y \times y)$. Identity 3 lets us move the parentheses with respect to the sums and get $x \times x + (x \times y + (y \times x + y \times y))$. We need to get $x \times y$ and $y \times x$ next to each other and not separated by parentheses so we can pull out the common factor of 1 later, but we have a problem now, which is that our current term is in the form of a sum, and multiple nested sums at that. This makes it extremely annoying to only try applying 1 identity at each step, as each time we really would only want to act on 1 branch while leaving all the others unmodified. So, we won't try to force the rest of this proof into the nice, clean, linear structure the first few lines had. There are a lot of branching paths and nested structures we have to deal with here.
+
+At this point, on line 55 after the definition of \texttt{step6}, our term is fully right-associative with regards to addition. The left part is $x \times x$ and the right part is $x \times y + (y \times x + y \times y)$. We want to turn the left part into $x^2 = 2 \to x$: to do that, we first apply the other direction of 11 to both $x$'s to get $x^1 \times x^1$. We then use the other direction of 12 to get addition in the exponent: $x^{1+1}$. At this point we have to do something similar to what was done on line 48: we create a new function that takes a \texttt{bool}, uses \texttt{two\_is\_one\_plus\_one} to turn it into a \texttt{(unit, unit) Either.t}, and then passes that as an argument to the term we generated of type \texttt{(unit, unit) Either.t -> 'x}, which all together gives us a \texttt{bool -> 'x}.
+
+Now we're dealing with $x \times y + (y \times x + y \times y)$. First, we use identity 3's other direction to get $(x \times y + y \times x) + y \times y$. To the right part, $y \times y$, we do the exact same thing from the previous paragraph to get $y^2 = 2 \to y$. On the left, we apply 6 to $y \times x$ to get $x \times y + x \times y$ and then 5's other direction to get $(x \times y) \times 1 + (x \times y) \times 1$. In \texttt{step7\_2} we distribute in reverse to get $(x \times y) \times (1 + 1)$, use 6 to get $1 + 1$ on the left, then apply \texttt{one\_plus\_one\_is\_two} to finally get $2 \times (x \times y)$. After that, the match statement that started all the way back on line 56 reconstructs the nested sum that we broke apart and returns the final value we generated in \texttt{step7}.
+
+Now we've written a program that serves as a mathematical proof. What does the program actually do though? Nothing at all. All the code you see in the appendix is just definitions of variables and functions, and there's no ``main'' function that executes whenever we run the compiled program. I think that should show the kind of power that type systems like System F have though: even when you write a program that quite literally does nothing, executes no code and has no computational side effects, it still \textit{means} something. Perhaps such a program could be said to have this as a side effect: its mere existence proves a theorem.
+
+\section{Lambek}
+
+In the previous section, we listed the 14 axioms that the connectives follow. What algebraic structure do these axioms create though? It might be hard to think of an algebraic structure that defines addition, multiplication, and exponentiation, but there is an answer: it is a Bicartesian closed category. Exploring this structure in further detail will reveal that the Curry-Howard correspondence actually has quite a bit more to it than what I've talked about so far.
+
+A category is a collection of objects and morphisms \cite{asperti}. It can be represented visually by a directed graph, where each object is a node and each morphism is an edge with a source and target object (please do not think of categories as \textit{being} graphs, though). All we can really say about what objects and morphisms are is that, generally, objects are collections of things and morphisms are mappings between those collections that preserve their structure. You can have a category where the objects are sets and the morphisms are functions between those sets; or where the objects are vector spaces and the morphisms are linear transformations; or where the objects are groups and the morphisms are group homomorphisms, etc. What matters is that morphisms can be composed: if morphisms $f: A \to B$ and $g: B \to C$ exist, there must also exist a morphism $g \circ f: A \to C$. Every object in the category must also have a morphism from itself to itself which acts as the identity of composition: if we have 2 objects $A$ and $B$ and 1 morphism $f: A \to B$ connecting them, there must also be morphisms $id_A: A \to A$ and $id_B: B \to B$ such that $f \circ id_A = id_B \circ f = f$.
+
+A certain type of category, the Bicartesian closed category I mentioned before, can act as a model of a type system or proof calculus. This was noticed by Joachim Lambek in 1980, thus making the full, true name of the correspondence the Curry-Howard-Lambek correspondence \cite{farooqui}.
+
+From a type perspective, the objects of a Bicartesian closed category are types, and the morphisms are terms, which connect the product of all the types in the typing context to the term's type. From a logic perspective, the objects are propositions, and the morphisms are proofs that connect the product of all its premises to its conclusion. There are constructions that match the various connectives of both systems: the void type and false are represented by the initial object, an object which has a morphism going from it to every other object (abort and ex falso quodlibet); the unit type and true are represented by the terminal object, an object which has a morphism coming to it from every other object (functions of the form $\lambda x^A.*$, which exist for every type, and the fact that everything implies true). Functions/implication, products/conjunction, and sums/disjunction are represented by exponential objects, products, and coproducts respectively, which are ``universal constructions'' that essentially try to find the most ``minimal'' object that satisfies certain properties: for exponentials, there must be an equivalent of function application, a morphism which connects $(A \to B) \times A$ with $B$; for products, there must be equivalents of $\pi_1$ and $\pi_2$ which let you ``take something out'' of them; and for coproducts, there must be equivalents of $\text{inj}_1$ and $\text{inj}_2$ which let you ``put something into'' them. Bicartesian closed categories really only represent SLTC and NJ, but there are categories that can model higher-level systems like System F as well \cite{asperti}.
+
+The reason why most discussions of the correspondence ignore Lambek is because category theory lacks in practical applications compared to the other 2 systems. Logic lets you prove statements, type systems let you create safe computer programs, but what can categories do for the average mathematician or computer scientist?
+
+Lambda calculus and natural deduction are ``pure syntax.'' What kind of mathematical object is a lambda calculus type or a logical formula, really? Ultimately, they're just strings defined by some grammar. Using categories as a model of these systems gives us an answer: they are objects in a Bicartesian closed category. This gives some semantics to the syntax, and allows us to reason about these systems more abstractly and generally using category theory. So, while Lambek is often left out of discussions of the correspondence because it doesn't have as many practical applications as the other 2 parts, we can say that it serves as a good mathematical model for them. To learn more about category theory from a type-focused perspective, see \cite{crole}.
+
+\printbibliography[heading=bibintoc]
+
+\appendix
+
+\section{Binomial expansion proof}
+
+\begin{lstlisting}[language={[Objective]Caml}]
+let three: (('x, 'y) Either.t, 'z) Either.t -> ('x, ('y, 'z) Either.t) Either.t = fun m ->
+	match m with
+	| Left xy ->
+		(match xy with
+		| Left x -> Left x
+		| Right y -> Right (Left y))
+	| Right z -> Right (Right z)
+let three': ('x, ('y, 'z) Either.t) Either.t -> (('x, 'y) Either.t, 'z) Either.t = fun m ->
+	match m with
+	| Left x -> Left (Left x)
+	| Right yz ->
+		match yz with
+		| Left y -> Left (Right y)
+		| Right z -> Right z
+
+let five': 'x -> 'x * unit = fun m -> (m, ())
+
+let six: 'x * 'y -> 'y * 'x = fun m -> (snd m, fst m)
+
+let eight: 'x * ('y, 'z) Either.t -> ('x * 'y, 'x * 'z) Either.t = fun m ->
+	match snd m with
+	| Left y -> Left (fst m, y)
+	| Right z -> Right (fst m, z)
+let eight': ('x * 'y, 'x * 'z) Either.t -> 'x * ('y, 'z) Either.t = fun m ->
+	match m with
+	| Left xy -> (fst xy, Left (snd xy))
+	| Right xz -> (fst xz, Right (snd xz))
+
+let eleven: (unit -> 'x) -> 'x = fun m -> m ()
+let eleven': 'x -> (unit -> 'x) = fun m -> fun () -> m
+
+let twelve: (('x, 'y) Either.t -> 'z) -> ('x -> 'z) * ('y -> 'z) = fun m -> ((fun x -> m (Left x)), (fun y -> m (Right y)))
+let twelve': ('x -> 'z) * ('y -> 'z) -> (('x, 'y) Either.t -> 'z) = fun m -> fun xy ->
+	match xy with
+	| Left x -> (fst m) x
+	| Right y -> (snd m) y
+
+let one_plus_one_is_two: (unit, unit) Either.t -> bool = fun m ->
+	match m with
+	| Left () -> true
+	| Right () -> false
+let two_is_one_plus_one: bool -> (unit, unit) Either.t = fun m ->
+	match m with
+	| true -> Left ()
+	| false -> Right ()
+
+let binomial_expansion: (bool -> ('x, 'y) Either.t) -> (bool -> 'x, (bool * ('x * 'y), bool -> 'y) Either.t) Either.t = fun m ->
+	let step1 = fun n -> m (one_plus_one_is_two n) in
+	let step2 = twelve step1 in
+	let step3 = (eleven (fst step2), eleven (snd step2)) in
+	let step4 = eight step3 in
+	let step5 = match step4 with
+	| Left x -> Either.Left (eight (six x))
+	| Right y -> Right (eight (six y)) in
+	let step6 = three step5 in
+	let step7 = match step6 with
+	| Left x -> Either.Left (fun n -> twelve' (eleven' (fst x), eleven' (snd x)) (two_is_one_plus_one n))
+	| Right y -> Right (match three' y with
+		| Left a ->
+			let step7_1 = match a with
+			| Left c -> Either.Left (five' c)
+			| Right d -> Right (five' (six d)) in
+			let step7_2 = eight' step7_1 in
+			let step7_3 = six step7_2 in
+			let step7_4 = one_plus_one_is_two (fst step7_3), snd step7_3 in
+			Either.Left step7_4
+		| Right b -> Right (fun n -> twelve' (eleven' (fst b), eleven' (snd b)) (two_is_one_plus_one n))) in
+	step7
+\end{lstlisting}
+
+\end{document}
